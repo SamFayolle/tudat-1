@@ -85,7 +85,7 @@ public:
             const std::shared_ptr< ObservationPartial< ObservationSize > > secondPartial,
             const std::function< double( const std::vector< double >&, const observation_models::LinkEndType ) > scalingFactorFunction,
             const std::pair< std::vector< int >, std::vector< int > >& undifferencedTimeAndStateIndices ):
-        ObservationPartial< ObservationSize >( firstPartial->getParameterIdentifier( ) ),
+        ObservationPartial< ObservationSize >( firstPartial != nullptr ? firstPartial->getParameterIdentifier( ) : secondPartial->getParameterIdentifier() ),
         firstPartial_( firstPartial ),
         secondPartial_( secondPartial ),
         scalingFactorFunction_( scalingFactorFunction ),
