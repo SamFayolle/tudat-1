@@ -1840,11 +1840,11 @@ std::shared_ptr< estimatable_parameters::EstimatableParameter< Eigen::VectorXd >
                 throw std::runtime_error( "Error when making desaturation Delta V parameter, no acceleration models found in list" );
 
             }
-            else if( desaturationAccelerationModels.size( ) > 1 )
-            {
-                throw std::runtime_error( "Error when making desaturation Delta V parameter, multiple acceleration models found in list" );
-
-            }
+//            else if( desaturationAccelerationModels.size( ) > 1 )
+//            {
+//                throw std::runtime_error( "Error when making desaturation Delta V parameter, multiple acceleration models found in list" );
+//
+//            }
             else
             {
                 // Create desaturation deltaV values parameter.

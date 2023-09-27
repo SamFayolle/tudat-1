@@ -177,7 +177,7 @@ MomentumWheelDesaturationPartial::getParameterPartialFunction(
     std::pair< std::function< void( Eigen::MatrixXd& ) >, int > partialFunctionPair;
 
     // Check dependencies.
-    if( parameter->getParameterName( ).first == estimatable_parameters::desaturation_delta_v_values )
+    if( parameter->getParameterName( ).first == estimatable_parameters::desaturation_delta_v_values && parameter->getParameterName( ).second.first == acceleratedBody_ )
     {
         // If parameter is desaturation deltaV values, check and create dependency function .
         partialFunctionPair = std::make_pair(
