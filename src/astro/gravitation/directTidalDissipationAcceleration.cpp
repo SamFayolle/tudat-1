@@ -32,6 +32,9 @@ Eigen::Vector3d computeDirectTidalAccelerationDueToTideOnPlanet(
     double distanceSquared = distance * distance;
     double radialComponentMultiplier = ( includeDirectRadialComponent == true ) ? 1.0 : 0.0;
 
+//    std::cout << "relativePosition: " << relativePosition.transpose( ) << "\n\n";
+//    std::cout << "planetAngularVelocityVector: " << planetAngularVelocityVector.transpose( ) << "\n\n";
+
     return currentTidalAccelerationMultiplier * (
                  radialComponentMultiplier * relativePosition + timeLag * (
                     2.0 * ( relativePosition.dot( relativeVelocity ) * relativePosition / distanceSquared ) +

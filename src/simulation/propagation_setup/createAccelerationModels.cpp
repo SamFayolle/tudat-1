@@ -30,6 +30,7 @@
 #include "tudat/simulation/propagation_setup/createAccelerationModels.h"
 #include "tudat/simulation/environment_setup/createFlightConditions.h"
 #include "tudat/simulation/environment_setup/createOccultationModel.h"
+#include "tudat/astro/ephemerides/synchronousRotationalEphemeris.h"
 
 
 namespace tudat
@@ -1682,8 +1683,12 @@ std::shared_ptr< gravitation::DirectTidalDissipationAcceleration > createDirectT
 
     else
     {
+//        std::shared_ptr< ephemerides::SynchronousRotationalEphemeris > test =
+//                std::dynamic_pointer_cast< ephemerides::SynchronousRotationalEphemeris >( bodyUndergoingAcceleration->getRotationalEphemeris( ) );
+//        std::cout << "getRotationalVelocityVectorInTargetFrame " << test->getRotationalVelocityVectorInTargetFrame( 0.0 ).transpose( ) << "\n\n";
+//        std::cout << "getRotationalVelocityVectorInBaseFrame " << test->getRotationalVelocityVectorInBaseFrame( 0.0 ).transpose( ) << "\n\n";
         std::function< Eigen::Vector3d( ) > moonAngularVelocityVectorFunction =
-                std::bind( &Body::getCurrentAngularVelocityVectorInGlobalFrame, bodyExertingAcceleration );
+                std::bind( &Body::getCurrentAngularVelocityVectorInGlobalFrame, bodyUndergoingAcceleration /*bodyExertingAcceleration*/ );
 
         // Create direct tidal model from tidal time lag directly
         if ( std::isnan( tidalAccelerationSettings->inverseTidalQualityFactor_ ) && std::isnan( tidalAccelerationSettings->tidalPeriod_ ) )
