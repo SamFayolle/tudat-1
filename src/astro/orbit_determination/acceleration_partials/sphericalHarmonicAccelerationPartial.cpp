@@ -48,7 +48,8 @@ SphericalHarmonicsGravityPartial::SphericalHarmonicsGravityPartial(
                                 accelerationModel, std::placeholders::_1 ) ),
     rotationMatrixPartials_( rotationMatrixPartials ),
     tidalLoveNumberPartialInterfaces_( tidalLoveNumberPartialInterfaces ),
-    accelerationUsesMutualAttraction_( accelerationModel->getIsMutualAttractionUsed( ) )
+    accelerationUsesMutualAttraction_( accelerationModel->getIsMutualAttractionUsed( ) ),
+    includeTimeVariability_( accelerationModel->isTimeVariabilityIncluded( ) )
 {
     sphericalHarmonicCache_->getLegendreCache( )->setComputeSecondDerivatives( 1 );
 
@@ -465,67 +466,70 @@ void SphericalHarmonicsGravityPartial::wrtTidalModelParameter(
     // Initialize partial matrix to zero values.
     partialMatrix = Eigen::Matrix< double, 3, Eigen::Dynamic >::Zero( 3, parameterSize );
 
-    // Calculate multiplicative term found in all partial terms (partial of C,S coefficients w.r.t. parameter).
-    std::vector< Eigen::Matrix< double, 2, Eigen::Dynamic > > coefficientPartialsPerOrder_ = coefficientPartialFunctions( );
-    int singleOrderPartialSize = coefficientPartialsPerOrder_.at( 0 ).cols( );
-
-    Eigen::MatrixXd currentPartialContribution = Eigen::MatrixXd::Zero( 3, 1 );
-    std::vector< std::pair< int, int > > blockIndices;
-    blockIndices.resize( 1 );
-
-    // Iterate over all required orders in current degree.
-    for( unsigned int i = 0; i < orders.size( ); i++ )
+    if ( includeTimeVariability_ )
     {
-        // Set coefficient degree/order for current partials
-        blockIndices[ 0 ] = std::make_pair( degree, orders.at( i ) );
+        // Calculate multiplicative term found in all partial terms (partial of C,S coefficients w.r.t. parameter).
+        std::vector< Eigen::Matrix< double, 2, Eigen::Dynamic > > coefficientPartialsPerOrder_ = coefficientPartialFunctions( );
+        int singleOrderPartialSize = coefficientPartialsPerOrder_.at( 0 ).cols( );
 
-        // Compute acceleration w.r.t. C and S coefficients, and multiply with partials of C,S coefficients w.r.t. parameter
-        if( sumOrders )
+        Eigen::MatrixXd currentPartialContribution = Eigen::MatrixXd::Zero( 3, 1 );
+        std::vector< std::pair< int, int > > blockIndices;
+        blockIndices.resize( 1 );
+
+        // Iterate over all required orders in current degree.
+        for( unsigned int i = 0; i < orders.size( ); i++ )
         {
-            calculateSphericalHarmonicGravityWrtCCoefficients(
-                        bodyFixedSphericalPosition_, bodyReferenceRadius_( ), gravitationalParameterFunction_( ),
-                        sphericalHarmonicCache_,
-                        blockIndices, coordinate_conversions::getSphericalToCartesianGradientMatrix(
-                            bodyFixedPosition_ ), fromBodyFixedToIntegrationFrameRotation_( ), currentPartialContribution,
-                        maximumDegree_, maximumOrder_  );
-
-            partialMatrix.block( 0, 0, 3, singleOrderPartialSize ) +=
-                    currentPartialContribution * coefficientPartialsPerOrder_.at( i ).block( 0, 0, 1, singleOrderPartialSize );
-
-
+            // Set coefficient degree/order for current partials
             blockIndices[ 0 ] = std::make_pair( degree, orders.at( i ) );
-            calculateSphericalHarmonicGravityWrtSCoefficients(
-                        bodyFixedSphericalPosition_, bodyReferenceRadius_( ), gravitationalParameterFunction_( ),
-                        sphericalHarmonicCache_,
-                        blockIndices, coordinate_conversions::getSphericalToCartesianGradientMatrix(
-                            bodyFixedPosition_ ), fromBodyFixedToIntegrationFrameRotation_( ), currentPartialContribution,
-                        maximumDegree_, maximumOrder_  );
 
-            partialMatrix.block( 0, 0, 3, singleOrderPartialSize ) +=
-                    currentPartialContribution * coefficientPartialsPerOrder_.at( i ).block( 1, 0, 1, singleOrderPartialSize );
-        }
-        else
-        {
-            calculateSphericalHarmonicGravityWrtCCoefficients(
-                        bodyFixedSphericalPosition_, bodyReferenceRadius_( ), gravitationalParameterFunction_( ),
-                        sphericalHarmonicCache_,
-                        blockIndices, coordinate_conversions::getSphericalToCartesianGradientMatrix(
-                            bodyFixedPosition_ ), fromBodyFixedToIntegrationFrameRotation_( ), currentPartialContribution,
-                        maximumDegree_, maximumOrder_  );
+            // Compute acceleration w.r.t. C and S coefficients, and multiply with partials of C,S coefficients w.r.t. parameter
+            if( sumOrders )
+            {
+                calculateSphericalHarmonicGravityWrtCCoefficients(
+                            bodyFixedSphericalPosition_, bodyReferenceRadius_( ), gravitationalParameterFunction_( ),
+                            sphericalHarmonicCache_,
+                            blockIndices, coordinate_conversions::getSphericalToCartesianGradientMatrix(
+                                bodyFixedPosition_ ), fromBodyFixedToIntegrationFrameRotation_( ), currentPartialContribution,
+                            maximumDegree_, maximumOrder_  );
 
-            partialMatrix.block( 0, i * singleOrderPartialSize, 3, singleOrderPartialSize ) +=
-                    currentPartialContribution * coefficientPartialsPerOrder_.at( i ).block( 0, 0, 1, singleOrderPartialSize );
+                partialMatrix.block( 0, 0, 3, singleOrderPartialSize ) +=
+                        currentPartialContribution * coefficientPartialsPerOrder_.at( i ).block( 0, 0, 1, singleOrderPartialSize );
 
-            calculateSphericalHarmonicGravityWrtSCoefficients(
-                        bodyFixedSphericalPosition_, bodyReferenceRadius_( ), gravitationalParameterFunction_( ),
-                        sphericalHarmonicCache_,
-                        blockIndices, coordinate_conversions::getSphericalToCartesianGradientMatrix(
-                            bodyFixedPosition_ ), fromBodyFixedToIntegrationFrameRotation_( ), currentPartialContribution,
-                        maximumDegree_, maximumOrder_  );
 
-            partialMatrix.block( 0, i * singleOrderPartialSize, 3, singleOrderPartialSize ) +=
-                    currentPartialContribution * coefficientPartialsPerOrder_.at( i ).block( 1, 0, 1, singleOrderPartialSize );
+                blockIndices[ 0 ] = std::make_pair( degree, orders.at( i ) );
+                calculateSphericalHarmonicGravityWrtSCoefficients(
+                            bodyFixedSphericalPosition_, bodyReferenceRadius_( ), gravitationalParameterFunction_( ),
+                            sphericalHarmonicCache_,
+                            blockIndices, coordinate_conversions::getSphericalToCartesianGradientMatrix(
+                                bodyFixedPosition_ ), fromBodyFixedToIntegrationFrameRotation_( ), currentPartialContribution,
+                            maximumDegree_, maximumOrder_  );
 
+                partialMatrix.block( 0, 0, 3, singleOrderPartialSize ) +=
+                        currentPartialContribution * coefficientPartialsPerOrder_.at( i ).block( 1, 0, 1, singleOrderPartialSize );
+            }
+            else
+            {
+                calculateSphericalHarmonicGravityWrtCCoefficients(
+                            bodyFixedSphericalPosition_, bodyReferenceRadius_( ), gravitationalParameterFunction_( ),
+                            sphericalHarmonicCache_,
+                            blockIndices, coordinate_conversions::getSphericalToCartesianGradientMatrix(
+                                bodyFixedPosition_ ), fromBodyFixedToIntegrationFrameRotation_( ), currentPartialContribution,
+                            maximumDegree_, maximumOrder_  );
+
+                partialMatrix.block( 0, i * singleOrderPartialSize, 3, singleOrderPartialSize ) +=
+                        currentPartialContribution * coefficientPartialsPerOrder_.at( i ).block( 0, 0, 1, singleOrderPartialSize );
+
+                calculateSphericalHarmonicGravityWrtSCoefficients(
+                            bodyFixedSphericalPosition_, bodyReferenceRadius_( ), gravitationalParameterFunction_( ),
+                            sphericalHarmonicCache_,
+                            blockIndices, coordinate_conversions::getSphericalToCartesianGradientMatrix(
+                                bodyFixedPosition_ ), fromBodyFixedToIntegrationFrameRotation_( ), currentPartialContribution,
+                            maximumDegree_, maximumOrder_  );
+
+                partialMatrix.block( 0, i * singleOrderPartialSize, 3, singleOrderPartialSize ) +=
+                        currentPartialContribution * coefficientPartialsPerOrder_.at( i ).block( 1, 0, 1, singleOrderPartialSize );
+
+            }
         }
     }
 }

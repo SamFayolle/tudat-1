@@ -113,10 +113,11 @@ public:
      */
     SphericalHarmonicAccelerationSettings( const int maximumDegree,
                                            const int maximumOrder,
-                                           const bool removePointMass = false ):
+                                           const bool removePointMass = false,
+                                           const bool includeTimeVariability = true ):
         AccelerationSettings( basic_astrodynamics::spherical_harmonic_gravity ),
         maximumDegree_( maximumDegree ), maximumOrder_( maximumOrder ),
-        removePointMass_( removePointMass ){ }
+        removePointMass_( removePointMass ), includeTimeVariability_( includeTimeVariability ){ }
 
 
     // Maximum degree that is to be used for spherical harmonic acceleration
@@ -126,13 +127,16 @@ public:
     int maximumOrder_;
 
     bool removePointMass_;
+
+    // Boolean denoting whether time-varying spherical harmonic coefficients should be considered
+    bool includeTimeVariability_;
 };
 
 //! @get_docstring(sphericalHarmonicAcceleration)
 inline std::shared_ptr< AccelerationSettings > sphericalHarmonicAcceleration(
-        const int maximumDegree, const int maximumOrder )
+        const int maximumDegree, const int maximumOrder, const bool includeTimeVariability = true )
 {
-    return std::make_shared< SphericalHarmonicAccelerationSettings >( maximumDegree, maximumOrder );
+    return std::make_shared< SphericalHarmonicAccelerationSettings >( maximumDegree, maximumOrder, false, includeTimeVariability );
 }
 
 // Class for providing acceleration settings for mutual spherical harmonics acceleration model.
@@ -161,13 +165,19 @@ public:
                                                  const int maximumDegreeOfBodyUndergoingAcceleration,
                                                  const int maximumOrderOfBodyUndergoingAcceleration,
                                                  const int maximumDegreeOfCentralBody = 0,
-                                                 const int maximumOrderOfCentralBody = 0 ):
+                                                 const int maximumOrderOfCentralBody = 0,
+                                                 const bool includeTimeVariabilityBodyExertingAcceleration = true,
+                                                 const bool includeTimeVariabilityBodyUnderAcceleration = true,
+                                                 const bool includeTimeVariabilityCentralBody = true ):
         AccelerationSettings( basic_astrodynamics::mutual_spherical_harmonic_gravity ),
         maximumDegreeOfBodyExertingAcceleration_( maximumDegreeOfBodyExertingAcceleration ),
         maximumOrderOfBodyExertingAcceleration_( maximumOrderOfBodyExertingAcceleration ),
         maximumDegreeOfBodyUndergoingAcceleration_( maximumDegreeOfBodyUndergoingAcceleration ),
         maximumOrderOfBodyUndergoingAcceleration_( maximumOrderOfBodyUndergoingAcceleration ),
-        maximumDegreeOfCentralBody_( maximumDegreeOfCentralBody ), maximumOrderOfCentralBody_( maximumOrderOfCentralBody ){ }
+        maximumDegreeOfCentralBody_( maximumDegreeOfCentralBody ), maximumOrderOfCentralBody_( maximumOrderOfCentralBody ),
+        includeTimeVariabilityBodyExertingAcceleration_( includeTimeVariabilityBodyExertingAcceleration ),
+        includeTimeVariabilityBodyUnderAcceleration_( includeTimeVariabilityBodyUnderAcceleration ),
+        includeTimeVariabilityCentralBody_( includeTimeVariabilityCentralBody ){ }
 
     // Maximum degree of body exerting acceleration.
     int maximumDegreeOfBodyExertingAcceleration_;
@@ -187,6 +197,15 @@ public:
     // Maximum order of central body (only releveant for 3rd body acceleration).
     int maximumOrderOfCentralBody_;
 
+    //! Boolean denoting whether the time variability of the gravity field should be considered for the body exerting acceleration
+    bool includeTimeVariabilityBodyExertingAcceleration_;
+
+    //! Boolean denoting whether the time variability of the gravity field should be considered for the body undergoing acceleration
+    bool includeTimeVariabilityBodyUnderAcceleration_;
+
+    //! Boolean denoting whether the time variability of the gravity field should be considered for the central body
+    bool includeTimeVariabilityCentralBody_;
+
 };
 
 //! @get_docstring(mutualSphericalHarmonicAcceleration)
@@ -196,7 +215,10 @@ inline std::shared_ptr< AccelerationSettings > mutualSphericalHarmonicAccelerati
 		const int maximumDegreeOfBodyUndergoingAcceleration,
 		const int maximumOrderOfBodyUndergoingAcceleration,
 		const int maximumDegreeOfCentralBody = 0,
-		const int maximumOrderOfCentralBody = 0
+		const int maximumOrderOfCentralBody = 0,
+        const bool includeTimeVariabilityBodyExertingAcceleration = true,
+        const bool includeTimeVariabilityBodyUnderAcceleration = true,
+        const bool includeTimeVariabilityCentralBody = true
 		)
 {
 	return std::make_shared< MutualSphericalHarmonicAccelerationSettings >(
@@ -205,7 +227,10 @@ inline std::shared_ptr< AccelerationSettings > mutualSphericalHarmonicAccelerati
 			maximumDegreeOfBodyUndergoingAcceleration,
 			maximumOrderOfBodyUndergoingAcceleration,
 			maximumDegreeOfCentralBody,
-			maximumOrderOfCentralBody
+			maximumOrderOfCentralBody,
+            includeTimeVariabilityBodyExertingAcceleration,
+            includeTimeVariabilityBodyUnderAcceleration,
+            includeTimeVariabilityCentralBody
 			);
 }
 

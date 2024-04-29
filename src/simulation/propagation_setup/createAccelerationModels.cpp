@@ -410,11 +410,24 @@ createSphericalHarmonicsGravityAcceleration(
                                    gravitationalParameterOfBodyUndergoingAcceleration );
             }
 
-            std::function< Eigen::MatrixXd( ) > originalCosineCoefficientFunction =
-                    std::bind( &SphericalHarmonicsGravityField::getCosineCoefficientsBlock,
-                               sphericalHarmonicsGravityField,
-                               sphericalHarmonicsSettings->maximumDegree_,
-                               sphericalHarmonicsSettings->maximumOrder_ );
+            // Retrieve proper cosine coefficient function
+            std::function< Eigen::MatrixXd( ) > originalCosineCoefficientFunction;
+
+            std::shared_ptr< TimeDependentSphericalHarmonicsGravityField > timeDependentSphericalHarmonicsGravityField =
+                    std::dynamic_pointer_cast< TimeDependentSphericalHarmonicsGravityField >(
+                            bodyExertingAcceleration->getGravityFieldModel( ) );
+            if ( ( timeDependentSphericalHarmonicsGravityField != nullptr ) && !( sphericalHarmonicsSettings->includeTimeVariability_ ) )
+            {
+                originalCosineCoefficientFunction =
+                        std::bind( &TimeDependentSphericalHarmonicsGravityField::getNominalCosineCoefficientsBlock, timeDependentSphericalHarmonicsGravityField,
+                                   sphericalHarmonicsSettings->maximumDegree_, sphericalHarmonicsSettings->maximumOrder_ );
+            }
+            else
+            {
+                originalCosineCoefficientFunction =
+                        std::bind( &SphericalHarmonicsGravityField::getCosineCoefficientsBlock, sphericalHarmonicsGravityField,
+                                   sphericalHarmonicsSettings->maximumDegree_, sphericalHarmonicsSettings->maximumOrder_ );
+            }
 
             std::function< Eigen::MatrixXd( ) > cosineCoefficientFunction;
             if( !useDegreeZeroTerm || sphericalHarmonicsSettings->removePointMass_ )
@@ -427,20 +440,33 @@ createSphericalHarmonicsGravityAcceleration(
                 cosineCoefficientFunction = originalCosineCoefficientFunction;
             }
 
+            // Retrieve proper sine coefficient function
+            std::function< Eigen::MatrixXd( ) > sineCoefficientFunction;
+            if ( ( timeDependentSphericalHarmonicsGravityField != nullptr ) && !( sphericalHarmonicsSettings->includeTimeVariability_ ) )
+            {
+                sineCoefficientFunction =
+                        std::bind( &TimeDependentSphericalHarmonicsGravityField::getNominalSineCoefficientsBlock, timeDependentSphericalHarmonicsGravityField,
+                                   sphericalHarmonicsSettings->maximumDegree_, sphericalHarmonicsSettings->maximumOrder_ );
+            }
+            else
+            {
+                sineCoefficientFunction =
+                        std::bind( &SphericalHarmonicsGravityField::getSineCoefficientsBlock, sphericalHarmonicsGravityField,
+                                   sphericalHarmonicsSettings->maximumDegree_, sphericalHarmonicsSettings->maximumOrder_ );
+            }
+
             // Create acceleration object.
             accelerationModel =
                     std::make_shared< SphericalHarmonicsGravitationalAccelerationModel >(
                     std::bind( &Body::getPositionByReference, bodyUndergoingAcceleration, std::placeholders::_1 ),
-                      gravitationalParameterFunction,
-                      sphericalHarmonicsGravityField->getReferenceRadius( ),
-                      cosineCoefficientFunction,
-                      std::bind( &SphericalHarmonicsGravityField::getSineCoefficientsBlock,
-                                 sphericalHarmonicsGravityField,
-                                 sphericalHarmonicsSettings->maximumDegree_,
-                                 sphericalHarmonicsSettings->maximumOrder_ ),
+                    gravitationalParameterFunction,
+                    sphericalHarmonicsGravityField->getReferenceRadius( ),
+                    cosineCoefficientFunction,
+                    sineCoefficientFunction,
                     std::bind( &Body::getPositionByReference, bodyExertingAcceleration, std::placeholders::_1 ),
-                      std::bind( &Body::getCurrentRotationToGlobalFrame,
-                                 bodyExertingAcceleration ), useMutualAttraction );
+                    std::bind( &Body::getCurrentRotationToGlobalFrame, bodyExertingAcceleration ), useMutualAttraction,
+                    std::make_shared< basic_mathematics::SphericalHarmonicsCache >( ),
+                    sphericalHarmonicsSettings->includeTimeVariability_ );
         }
     }
     return accelerationModel;
@@ -528,15 +554,90 @@ createMutualSphericalHarmonicsGravityAcceleration(
             // Create acceleration object.
 
             int maximumDegreeOfUndergoingBody, maximumOrderOfUndergoingBody;
+            bool includeTimeVariabilityBodyUnderAcceleration;
             if( !acceleratedBodyIsCentralBody )
             {
                 maximumDegreeOfUndergoingBody = mutualSphericalHarmonicsSettings->maximumDegreeOfBodyUndergoingAcceleration_;
                 maximumOrderOfUndergoingBody = mutualSphericalHarmonicsSettings->maximumOrderOfBodyUndergoingAcceleration_;
+                includeTimeVariabilityBodyUnderAcceleration = mutualSphericalHarmonicsSettings->includeTimeVariabilityBodyUnderAcceleration_;
             }
             else
             {
                 maximumDegreeOfUndergoingBody = mutualSphericalHarmonicsSettings->maximumDegreeOfCentralBody_;
                 maximumOrderOfUndergoingBody = mutualSphericalHarmonicsSettings->maximumOrderOfCentralBody_;
+                includeTimeVariabilityBodyUnderAcceleration = mutualSphericalHarmonicsSettings->includeTimeVariabilityCentralBody_;
+            }
+
+            // Define coefficients functions for body exerting acceleration
+            std::shared_ptr< TimeDependentSphericalHarmonicsGravityField > timeDependentGravityFieldBodyExertingAcceleration =
+                    std::dynamic_pointer_cast< TimeDependentSphericalHarmonicsGravityField >(
+                            bodyExertingAcceleration->getGravityFieldModel( ) );
+
+            std::function< Eigen::MatrixXd( ) > cosineCoefficientFunctionBodyExertingAcceleration;
+            if ( ( timeDependentGravityFieldBodyExertingAcceleration != nullptr ) && !( mutualSphericalHarmonicsSettings->includeTimeVariabilityBodyExertingAcceleration_ ) )
+            {
+                cosineCoefficientFunctionBodyExertingAcceleration =
+                        std::bind( &TimeDependentSphericalHarmonicsGravityField::getNominalCosineCoefficientsBlock, timeDependentGravityFieldBodyExertingAcceleration,
+                                   mutualSphericalHarmonicsSettings->maximumDegreeOfBodyExertingAcceleration_,
+                                   mutualSphericalHarmonicsSettings->maximumOrderOfBodyExertingAcceleration_ );
+            }
+            else
+            {
+                cosineCoefficientFunctionBodyExertingAcceleration =
+                        std::bind( &SphericalHarmonicsGravityField::getCosineCoefficientsBlock, sphericalHarmonicsGravityFieldOfBodyExertingAcceleration,
+                                   mutualSphericalHarmonicsSettings->maximumDegreeOfBodyExertingAcceleration_,
+                                   mutualSphericalHarmonicsSettings->maximumOrderOfBodyExertingAcceleration_ );
+            }
+
+            std::function< Eigen::MatrixXd( ) > sineCoefficientFunctionBodyExertingAcceleration;
+            if ( ( timeDependentGravityFieldBodyExertingAcceleration != nullptr ) && !( mutualSphericalHarmonicsSettings->includeTimeVariabilityBodyExertingAcceleration_ ) )
+            {
+                sineCoefficientFunctionBodyExertingAcceleration =
+                        std::bind( &TimeDependentSphericalHarmonicsGravityField::getNominalSineCoefficientsBlock, timeDependentGravityFieldBodyExertingAcceleration,
+                                   mutualSphericalHarmonicsSettings->maximumDegreeOfBodyExertingAcceleration_,
+                                   mutualSphericalHarmonicsSettings->maximumOrderOfBodyExertingAcceleration_ );
+            }
+            else
+            {
+                sineCoefficientFunctionBodyExertingAcceleration =
+                        std::bind( &SphericalHarmonicsGravityField::getSineCoefficientsBlock, sphericalHarmonicsGravityFieldOfBodyExertingAcceleration,
+                                   mutualSphericalHarmonicsSettings->maximumDegreeOfBodyExertingAcceleration_,
+                                   mutualSphericalHarmonicsSettings->maximumOrderOfBodyExertingAcceleration_ );
+            }
+
+
+            // Define coefficients functions for body undergoing acceleration
+            std::shared_ptr< TimeDependentSphericalHarmonicsGravityField > timeDependentGravityFieldBodyUndergoingAcceleration =
+                    std::dynamic_pointer_cast< TimeDependentSphericalHarmonicsGravityField >(
+                            bodyUndergoingAcceleration->getGravityFieldModel( ) );
+
+            std::function< Eigen::MatrixXd( ) > cosineCoefficientFunctionBodyUndergoingAcceleration;
+
+            if ( ( timeDependentGravityFieldBodyUndergoingAcceleration != nullptr ) && !( includeTimeVariabilityBodyUnderAcceleration ) )
+            {
+                cosineCoefficientFunctionBodyUndergoingAcceleration =
+                        std::bind( &TimeDependentSphericalHarmonicsGravityField::getNominalCosineCoefficientsBlock, timeDependentGravityFieldBodyUndergoingAcceleration,
+                                   maximumDegreeOfUndergoingBody, maximumOrderOfUndergoingBody );
+            }
+            else
+            {
+                cosineCoefficientFunctionBodyUndergoingAcceleration =
+                        std::bind( &SphericalHarmonicsGravityField::getCosineCoefficientsBlock, sphericalHarmonicsGravityFieldOfBodyUndergoingAcceleration,
+                                   maximumDegreeOfUndergoingBody, maximumOrderOfUndergoingBody );
+            }
+
+            std::function< Eigen::MatrixXd( ) > sineCoefficientFunctionBodyUndergoingAcceleration;
+            if ( ( timeDependentGravityFieldBodyUndergoingAcceleration != nullptr ) && !( includeTimeVariabilityBodyUnderAcceleration ) )
+            {
+                sineCoefficientFunctionBodyUndergoingAcceleration =
+                        std::bind( &TimeDependentSphericalHarmonicsGravityField::getNominalSineCoefficientsBlock, timeDependentGravityFieldBodyUndergoingAcceleration,
+                                   maximumDegreeOfUndergoingBody, maximumOrderOfUndergoingBody );
+            }
+            else
+            {
+                sineCoefficientFunctionBodyUndergoingAcceleration =
+                        std::bind( &SphericalHarmonicsGravityField::getSineCoefficientsBlock, sphericalHarmonicsGravityFieldOfBodyUndergoingAcceleration,
+                                   maximumDegreeOfUndergoingBody, maximumOrderOfUndergoingBody );
             }
 
             accelerationModel = std::make_shared< MutualSphericalHarmonicsGravitationalAccelerationModel >(
@@ -545,27 +646,19 @@ createMutualSphericalHarmonicsGravityAcceleration(
                         gravitationalParameterFunction,
                         sphericalHarmonicsGravityFieldOfBodyExertingAcceleration->getReferenceRadius( ),
                         sphericalHarmonicsGravityFieldOfBodyUndergoingAcceleration->getReferenceRadius( ),
-                        std::bind( &SphericalHarmonicsGravityField::getCosineCoefficientsBlock,
-                                   sphericalHarmonicsGravityFieldOfBodyExertingAcceleration,
-                                   mutualSphericalHarmonicsSettings->maximumDegreeOfBodyExertingAcceleration_,
-                                   mutualSphericalHarmonicsSettings->maximumOrderOfBodyExertingAcceleration_ ),
-                        std::bind( &SphericalHarmonicsGravityField::getSineCoefficientsBlock,
-                                   sphericalHarmonicsGravityFieldOfBodyExertingAcceleration,
-                                   mutualSphericalHarmonicsSettings->maximumDegreeOfBodyExertingAcceleration_,
-                                   mutualSphericalHarmonicsSettings->maximumOrderOfBodyExertingAcceleration_ ),
-                        std::bind( &SphericalHarmonicsGravityField::getCosineCoefficientsBlock,
-                                   sphericalHarmonicsGravityFieldOfBodyUndergoingAcceleration,
-                                   maximumDegreeOfUndergoingBody,
-                                   maximumOrderOfUndergoingBody ),
-                        std::bind( &SphericalHarmonicsGravityField::getSineCoefficientsBlock,
-                                   sphericalHarmonicsGravityFieldOfBodyUndergoingAcceleration,
-                                   maximumDegreeOfUndergoingBody,
-                                   maximumOrderOfUndergoingBody ),
+                        cosineCoefficientFunctionBodyExertingAcceleration,
+                        sineCoefficientFunctionBodyExertingAcceleration,
+                        cosineCoefficientFunctionBodyUndergoingAcceleration,
+                        sineCoefficientFunctionBodyUndergoingAcceleration,
                         std::bind( &Body::getCurrentRotationToGlobalFrame,
                                    bodyExertingAcceleration ),
                         std::bind( &Body::getCurrentRotationToGlobalFrame,
                                    bodyUndergoingAcceleration ),
-                        useCentralBodyFixedFrame );
+                        useCentralBodyFixedFrame,
+                        std::make_shared< basic_mathematics::SphericalHarmonicsCache >( ),
+                        std::make_shared< basic_mathematics::SphericalHarmonicsCache >( ),
+                        mutualSphericalHarmonicsSettings->includeTimeVariabilityBodyExertingAcceleration_,
+                        includeTimeVariabilityBodyUnderAcceleration );
         }
     }
     return accelerationModel;
@@ -901,12 +994,12 @@ createThirdBodyMutualSphericalHarmonicGravityAccelerationModel(
         }
         else
         {
-            std::shared_ptr< MutualSphericalHarmonicAccelerationSettings > accelerationSettingsForCentralBodyAcceleration =
-                    std::make_shared< MutualSphericalHarmonicAccelerationSettings >(
-                        mutualSphericalHarmonicsSettings->maximumDegreeOfBodyExertingAcceleration_,
-                        mutualSphericalHarmonicsSettings->maximumOrderOfBodyExertingAcceleration_,
-                        mutualSphericalHarmonicsSettings->maximumDegreeOfCentralBody_,
-                        mutualSphericalHarmonicsSettings->maximumOrderOfCentralBody_ );
+//            std::shared_ptr< MutualSphericalHarmonicAccelerationSettings > accelerationSettingsForCentralBodyAcceleration =
+//                    std::make_shared< MutualSphericalHarmonicAccelerationSettings >(
+//                        mutualSphericalHarmonicsSettings->maximumDegreeOfBodyExertingAcceleration_,
+//                        mutualSphericalHarmonicsSettings->maximumOrderOfBodyExertingAcceleration_,
+//                        mutualSphericalHarmonicsSettings->maximumDegreeOfCentralBody_,
+//                        mutualSphericalHarmonicsSettings->maximumOrderOfCentralBody_ );
             accelerationModel =  std::make_shared< ThirdBodyMutualSphericalHarmonicsGravitationalAccelerationModel >(
                         std::dynamic_pointer_cast< MutualSphericalHarmonicsGravitationalAccelerationModel >(
                             createMutualSphericalHarmonicsGravityAcceleration(
@@ -915,7 +1008,7 @@ createThirdBodyMutualSphericalHarmonicGravityAccelerationModel(
                         std::dynamic_pointer_cast< MutualSphericalHarmonicsGravitationalAccelerationModel >(
                             createMutualSphericalHarmonicsGravityAcceleration(
                                 centralBody, bodyExertingAcceleration, nameOfCentralBody,
-                                nameOfBodyExertingAcceleration, accelerationSettingsForCentralBodyAcceleration, 0, 1 ) ),
+                                nameOfBodyExertingAcceleration, mutualSphericalHarmonicsSettings /*accelerationSettingsForCentralBodyAcceleration*/, 0, 1 ) ),
                         nameOfCentralBody );
         }
     }

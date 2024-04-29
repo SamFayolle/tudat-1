@@ -167,6 +167,20 @@ public:
         return nominalCosineCoefficients_;
     }
 
+    //! Function to get the nominal cosine spherical harmonic coefficient block (geodesy normalized, without variation)
+    /*!
+     *  Function to get a nominal cosine spherical harmonic coefficient block (geodesy normalized, without variation)
+    *   up to a given degree and order
+     *  \param maximumDegree Maximum degree of coefficient block
+     *  \param maximumOrder Maximum order of coefficient block
+     *  \return Nominal cosine spherical harmonic coefficients (geodesy normalized, without variation) up to given
+     *  degree and order
+     */
+    Eigen::MatrixXd getNominalCosineCoefficientsBlock( const int maximumDegree, const int maximumOrder )
+    {
+        return nominalCosineCoefficients_.block( 0, 0, maximumDegree + 1, maximumOrder + 1 );
+    }
+
     //! Get current total correction to cosine coefficients
     /*!
      * Get current total correction to cosine coefficients up to given degree and order
@@ -282,6 +296,20 @@ public:
     Eigen::MatrixXd getNominalSineCoefficients( )
     {
         return nominalSineCoefficients_;
+    }
+
+    //! Function to get the nominal sine spherical harmonic coefficient block (geodesy normalized, without variation)
+    /*!
+     *  Function to get a nominal sine spherical harmonic coefficient block (geodesy normalized, without variation)
+    *   up to a given degree and order
+     *  \param maximumDegree Maximum degree of coefficient block
+     *  \param maximumOrder Maximum order of coefficient block
+     *  \return Nominal sine spherical harmonic coefficients (geodesy normalized, without variation) up to given
+     *  degree and order
+     */
+    Eigen::MatrixXd getNominalSineCoefficientsBlock( const int maximumDegree, const int maximumOrder )
+    {
+        return nominalSineCoefficients_.block( 0, 0, maximumDegree + 1, maximumOrder + 1 );
     }
 
     //! Set nominal (i.e. with zero variations) sine coefficients.

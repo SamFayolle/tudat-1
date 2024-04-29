@@ -170,7 +170,8 @@ std::shared_ptr< gravitation::SphericalHarmonicGravitationalTorqueModel > create
     std::shared_ptr< AccelerationSettings > sphericalHarmonicAccelerationSettings =
             std::make_shared< SphericalHarmonicAccelerationSettings >(
                 sphericalHarmonicTorqueSettings->maximumDegree_,
-                sphericalHarmonicTorqueSettings->maximumOrder_ );
+                sphericalHarmonicTorqueSettings->maximumOrder_,
+                sphericalHarmonicTorqueSettings->includeTimeVariability_ );
     std::shared_ptr< gravitation::SphericalHarmonicsGravitationalAccelerationModel > sphericalHarmonicAcceleration =
             std::dynamic_pointer_cast< gravitation::SphericalHarmonicsGravitationalAccelerationModel >(
                  createSphericalHarmonicsGravityAcceleration(

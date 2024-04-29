@@ -98,7 +98,8 @@ public:
             [ ]( ){ return Eigen::Quaterniond( Eigen::Matrix3d::Identity( ) ); },
             const bool isMutualAttractionUsed = 0,
             std::shared_ptr< basic_mathematics::SphericalHarmonicsCache > sphericalHarmonicsCache =
-            std::make_shared< basic_mathematics::SphericalHarmonicsCache >( ) )
+            std::make_shared< basic_mathematics::SphericalHarmonicsCache >( ),
+            const bool includeTimeVariability = true )
         : Base( positionOfBodySubjectToAccelerationFunction,
                 aGravitationalParameter,
                 positionOfBodyExertingAccelerationFunction,
@@ -109,7 +110,7 @@ public:
           rotationFromBodyFixedToIntegrationFrameFunction_(
               rotationFromBodyFixedToIntegrationFrameFunction ),
           sphericalHarmonicsCache_( sphericalHarmonicsCache ),
-          saveSphericalHarmonicTermsSeparately_( false )
+          saveSphericalHarmonicTermsSeparately_( false ), includeTimeVariability_( includeTimeVariability )
     {
         maximumDegree_ = static_cast< int >( getCosineHarmonicsCoefficients( ).rows( ) );
         maximumOrder_ = static_cast< int >( getCosineHarmonicsCoefficients( ).cols( ) );
@@ -160,7 +161,8 @@ public:
             [ ]( ){ return Eigen::Quaterniond( Eigen::Matrix3d::Identity( ) ); },
             const bool isMutualAttractionUsed = 0,
             std::shared_ptr< basic_mathematics::SphericalHarmonicsCache > sphericalHarmonicsCache
-            = std::make_shared< basic_mathematics::SphericalHarmonicsCache >( ) )
+            = std::make_shared< basic_mathematics::SphericalHarmonicsCache >( ),
+            const bool includeTimeVariability = true )
         : Base( positionOfBodySubjectToAccelerationFunction,
                 aGravitationalParameterFunction,
                 positionOfBodyExertingAccelerationFunction,
@@ -170,7 +172,7 @@ public:
           getSineHarmonicsCoefficients( sineHarmonicCoefficientsFunction ),
           rotationFromBodyFixedToIntegrationFrameFunction_( rotationFromBodyFixedToIntegrationFrameFunction ),
           sphericalHarmonicsCache_( sphericalHarmonicsCache ),
-          saveSphericalHarmonicTermsSeparately_( false )
+          saveSphericalHarmonicTermsSeparately_( false ), includeTimeVariability_( includeTimeVariability )
     {
         maximumDegree_ = static_cast< int >( getCosineHarmonicsCoefficients( ).rows( ) );
         maximumOrder_ = static_cast< int >( getCosineHarmonicsCoefficients( ).cols( ) );
@@ -472,6 +474,12 @@ public:
         return maximumOrder_;
     }
 
+    //! Function to determine whether the time variability of the gravity field is included in the SH model.
+    bool isTimeVariabilityIncluded( )
+    {
+        return includeTimeVariability_;
+    }
+
 
 protected:
 
@@ -539,6 +547,9 @@ private:
 
     //! Maximum order of gravity field expansion
     int maximumOrder_;
+
+    //! Boolean denoting whether the time variations of the gravity field should be accounted for in the acceleration model
+    bool includeTimeVariability_;
 
 };
 

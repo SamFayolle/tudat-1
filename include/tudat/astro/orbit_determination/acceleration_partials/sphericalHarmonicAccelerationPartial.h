@@ -524,6 +524,9 @@ protected:
      */
     bool accelerationUsesMutualAttraction_;
 
+    //! Boolean denoting whether the time variations of the gravity field should be taken into account in the partials of this acceleration model
+    bool includeTimeVariability_;
+
 };
 
 } // namespace acceleration_partials

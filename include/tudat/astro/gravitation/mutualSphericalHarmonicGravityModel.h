@@ -125,7 +125,9 @@ public:
             std::make_shared< basic_mathematics::SphericalHarmonicsCache >( ),
             std::shared_ptr< basic_mathematics::SphericalHarmonicsCache >
             sphericalHarmonicsCacheOfBodyUndergoingAcceleration =
-            std::make_shared< basic_mathematics::SphericalHarmonicsCache >( ) ):
+            std::make_shared< basic_mathematics::SphericalHarmonicsCache >( ),
+            const bool includeTimeVariabilityBodyExertingAcceleration = true,
+            const bool includeTimeVariabilityBodyUnderAcceleration = true ):
         useCentralBodyFixedFrame_( useCentralBodyFixedFrame ),
         gravitationalParameterFunction_( gravitationalParameterFunction )
     {
@@ -139,7 +141,7 @@ public:
                     sineHarmonicCoefficientsFunctionOfBodyExertingAcceleration,
                     positionOfBodyExertingAccelerationFunction,
                     toLocalFrameOfBodyExertingAccelerationTransformation,
-                    useCentralBodyFixedFrame, sphericalHarmonicsCacheOfBodyExertingAcceleration );
+                    useCentralBodyFixedFrame, sphericalHarmonicsCacheOfBodyExertingAcceleration, includeTimeVariabilityBodyExertingAcceleration );
 
         // Create spherical harmonic acceleration due to expansion of body undergoing acceleration, with the C(0,0) term set
         // to zero to prevent the double computation of the central term. Note that the order of the position functions is
@@ -154,7 +156,7 @@ public:
                     sineHarmonicCoefficientsFunctionOfBodyUndergoingAcceleration,
                     positionOfBodySubjectToAccelerationFunction,
                     toLocalFrameOfBodyUndergoingAccelerationTransformation,
-                    useCentralBodyFixedFrame, sphericalHarmonicsCacheOfBodyUndergoingAcceleration );
+                    useCentralBodyFixedFrame, sphericalHarmonicsCacheOfBodyUndergoingAcceleration, includeTimeVariabilityBodyUnderAcceleration );
     }
 
     //! Update member variables used by the acceleration model.

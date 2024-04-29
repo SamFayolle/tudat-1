@@ -68,15 +68,19 @@ public:
      * \param maximumOrder Maximum order to which gravity field of body undergoing torque is to be exerted
      */
     SphericalHarmonicTorqueSettings( const int maximumDegree,
-                                     const int maximumOrder ):
+                                     const int maximumOrder,
+                                     const bool includeTimeVariability = true ):
         TorqueSettings( basic_astrodynamics::spherical_harmonic_gravitational_torque ),
-        maximumDegree_( maximumDegree ), maximumOrder_( maximumOrder ){ }
+        maximumDegree_( maximumDegree ), maximumOrder_( maximumOrder ), includeTimeVariability_( includeTimeVariability ){ }
 
     // Maximum degree to which gravity field of body undergoing torque is to be exerted
     int maximumDegree_;
 
     // Maximum order to which gravity field of body undergoing torque is to be exerted
     int maximumOrder_;
+
+    //! Boolean denoting whether the time variability of the gravity field should be accounted for.
+    bool includeTimeVariability_;
 };
 
 inline Eigen::Vector3d applyTorqueScalingFunction(
@@ -122,9 +126,9 @@ inline std::shared_ptr< TorqueSettings > secondDegreeGravitationalTorque( )
 
 //! @get_docstring(sphericalHarmonicGravitationalTorque)
 inline std::shared_ptr< TorqueSettings > sphericalHarmonicGravitationalTorque(
-        const int maximumDegree, const int maximumOrder)
+        const int maximumDegree, const int maximumOrder, const bool includeTimeVariability = true )
 {
-    return std::make_shared< SphericalHarmonicTorqueSettings >( maximumDegree, maximumOrder );
+    return std::make_shared< SphericalHarmonicTorqueSettings >( maximumDegree, maximumOrder, includeTimeVariability );
 }
 
 inline std::shared_ptr< TorqueSettings > dissipativeTorque(
