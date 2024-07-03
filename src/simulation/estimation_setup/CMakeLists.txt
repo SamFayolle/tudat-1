@@ -22,6 +22,7 @@ set(estimation_HEADERS
         orbitDeterminationManager.h
         createLightTimeCorrectionPartials.h
         createEstimatableParameters.h
+        createParameterConstraints.h
         createCartesianStatePartials.h
         createTorquePartials.h
         createStateDerivativePartials.h
@@ -52,6 +53,7 @@ set(estimation_SOURCES
         variationalEquationsSolver.cpp
         createObservationManager.cpp
         createEstimatableParameters.cpp
+        createParameterConstraints.cpp
         createLightTimeCorrection.cpp
         createAtmosphericLightTimeCorrection.cpp
         createLightTimeCorrectionPartials.cpp

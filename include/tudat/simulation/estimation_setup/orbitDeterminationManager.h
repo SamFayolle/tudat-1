@@ -808,6 +808,8 @@ public:
                 Eigen::MatrixXd constraintStateMultiplier;
                 Eigen::VectorXd constraintRightHandSide;
                 parametersToEstimate_->getConstraints( constraintStateMultiplier, constraintRightHandSide );
+                std::cout << "constraintStateMultiplier: " << constraintStateMultiplier << "\n\n";
+                std::cout << "constraintRightHandSide: " << constraintRightHandSide << "\n\n";
 
                 double conditionNumberCheck = estimationInput->getLimitConditionNumberForWarning( );
                 if( numberOfIterations > 0 && estimationInput->conditionNumberWarningEachIteration_ == false )

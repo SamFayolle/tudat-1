@@ -105,6 +105,7 @@ BOOST_AUTO_TEST_CASE( test_DissipationParameterEstimation )
         double europaPeriod = 3.551 * 86400.0;
         double synodicPeriodEuropa = 2.0 * mathematical_constants::PI / ( 2.0 * std::fabs( jupiterRotationRate - 2.0 * mathematical_constants::PI / europaPeriod ) );
         double europaInvQ = std::tan( satelliteTimeLag / europaPeriod * 2.0 * mathematical_constants::PI );
+        std::cout << "ioInvQ: " << ioInvQ << "\n\n";
 
         SelectedAccelerationMap accelerationMap;
         for( unsigned int i = 0; i < satelliteNames.size( ); i++ )
@@ -296,6 +297,7 @@ BOOST_AUTO_TEST_CASE( test_DissipationParameterEstimation )
 
 
         // Perturb parameter values
+        std::cout << "initialParameterEstimate: " << initialParameterEstimate.transpose( ) << "\n\n";
         Eigen::VectorXd truthParameters = initialParameterEstimate;
         for( unsigned int i = 0; i < bodiesToEstimate.size( ); i++ )
         {

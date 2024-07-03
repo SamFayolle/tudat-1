@@ -88,6 +88,7 @@ BOOST_AUTO_TEST_CASE( test_EstimationFromPosition )
 
     }
 
+    std::cout << "INTERESTING TEST" << "\n\n";
     {
 
         std::pair<std::shared_ptr<simulation_setup::EstimationOutput<double> >,

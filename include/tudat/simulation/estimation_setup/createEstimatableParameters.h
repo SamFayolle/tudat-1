@@ -48,6 +48,8 @@
 #include "tudat/simulation/estimation_setup/estimatableParameterSettings.h"
 #include "tudat/simulation/propagation_setup/dynamicsSimulator.h"
 #include "tudat/simulation/environment_setup/body.h"
+#include "tudat/astro/orbit_determination/estimatable_parameters/parameterConstraints.h"
+#include "tudat/simulation/estimation_setup/createParameterConstraints.h"
 
 namespace tudat
 {
@@ -2056,6 +2058,273 @@ bool checkCompatibilityDirectTidalParameters(
     return compatibleParameters;
 }
 
+template< typename InitialStateParameterType = double >
+std::vector< Eigen::MatrixXd > updateLoveNumberTidalQualityFactorConstraints(
+        std::shared_ptr< estimatable_parameters::EstimatableParameterSet< InitialStateParameterType > > parameters,
+        std::vector< int > indicesK2Re,
+        std::vector< int > indicesK2Im,
+        std::vector< int > indicesInvQ )
+{
+    std::vector< Eigen::MatrixXd > constraintsVector;
+
+    for ( unsigned int j = 0 ; j < indicesK2Re.size( ) ; j++ )
+    {
+//        int indexK2Re = indicesK2Re[ j ];
+//        int indexK2Im = indicesK2Im[ j ];
+//        int indexInvQ = indicesInvQ[ j ];
+
+        double k2Re = parameters->template getFullParameterValues< double >( )[ indicesK2Re[ j ] ];
+        double k2Im = parameters->template getFullParameterValues< double >( )[ indicesK2Im[ j ] ]; // TO DO - FIX THIS IN CASE THE IMAGINARY PART IS NOT INCLUDED
+        double k2Full = std::sqrt( k2Re * k2Re + k2Im * k2Im );
+        double InvQ = parameters->template getFullParameterValues< double >( )[ indicesInvQ[ j ] ];
+
+
+        std::cout << "indexReK2: " << indicesK2Re[ j ] << "\n\n";
+        std::cout << "indexImK2: " << indicesK2Im[ j ] << "\n\n";
+        std::cout << "indexInvQ: " << indicesInvQ[ j ] << "\n\n";
+
+        std::cout << "ReK2: " << k2Re << "\n\n";
+        std::cout << "ImK2: " << k2Im << "\n\n";
+        std::cout << "InvQ: " << InvQ << "\n\n";
+
+        // Define constraints
+        Eigen::MatrixXd constraint = Eigen::MatrixXd::Zero( 1, parameters->getParameterSetSize( ) );
+
+        constraint( 0, indicesK2Re[ j ] ) = - ( k2Re * k2Im ) / std::pow( k2Full, 3 );
+        constraint( 0, indicesK2Im[ j ] ) = ( k2Re * k2Re ) / std::pow( k2Full, 3 );
+        constraint( 0, indicesInvQ[ j ] ) = - 1.0;
+
+        constraintsVector.push_back( constraint );
+    }
+}
+
+
+template< typename InitialStateParameterType = double >
+std::vector< Eigen::MatrixXd > updateLoveNumberTidalTimeLagConstraints(
+        std::shared_ptr< estimatable_parameters::EstimatableParameterSet< InitialStateParameterType > > parameters,
+        std::vector< int > indicesK2Re,
+        std::vector< int > indicesK2Im,
+        std::vector< int > indicesTimeLag )
+{
+    std::vector< Eigen::MatrixXd > constraintsVector;
+
+    for ( unsigned int j = 0 ; j < indicesK2Re.size( ) ; j++ )
+    {
+        double k2Re = parameters->template getFullParameterValues< double >( )[ indicesK2Re[ j ] ];
+        double k2Im = parameters->template getFullParameterValues< double >( )[ indicesK2Im[ j ] ];
+        double k2Full = std::sqrt( k2Re * k2Re + k2Im * k2Im );
+        double invQ = k2Im / k2Full;
+
+        double timeLag = parameters->template getFullParameterValues< double >( )[ indicesTimeLag[ j ] ];
+
+        std::cout << "indexReK2: " << indicesK2Re[ j ] << "\n\n";
+        std::cout << "indexImK2: " << indicesK2Im[ j ] << "\n\n";
+        std::cout << "indexTimeLag: " << indicesTimeLag[ j ] << "\n\n";
+
+        std::cout << "ReK2: " << k2Re << "\n\n";
+        std::cout << "ImK2: " << k2Im << "\n\n";
+        std::cout << "timeLag: " << timeLag << "\n\n";
+
+        // Define constraints
+        Eigen::MatrixXd constraint = Eigen::MatrixXd::Zero( 1, parameters->getParameterSetSize( ) );
+
+        double multiplyingFactorConstraint = ( timeLag / std::atan( invQ ) )
+                                             * ( k2Full * k2Full ) / ( k2Full * k2Full + k2Im * k2Im );
+        constraint( 0, indicesK2Re[ j ] ) = - ( k2Re * k2Im ) / std::pow( k2Full, 3 );
+        constraint( 0, indicesK2Im[ j ] ) = ( k2Re * k2Re ) / std::pow( k2Full, 3 );
+        constraint( 0, indicesTimeLag[ j ] ) = - 1.0;
+
+        constraintsVector.push_back( multiplyingFactorConstraint * constraint );
+    }
+
+}
+
+
+//template< typename InitialStateParameterType = double >
+//void addConstraintsTidalParameters( std::shared_ptr< estimatable_parameters::EstimatableParameterSet< InitialStateParameterType > > parameters )
+//{
+//    using namespace tudat::estimatable_parameters;
+//
+//    // Retrieve indices single degree Love number
+//    std::pair< std::vector< std::pair< std::string, std::string > >, std::vector< std::pair< int, int > > > indicesSingleDegreeLoveNumber =
+//            parameters->getIndicesForParameterType( single_degree_variable_tidal_love_number );
+//    std::vector< std::pair< std::pair< std::string, std::string >, std::pair< int, int > > > indSingleDegreeK2;
+//    for ( unsigned int i = 0 ; i < indicesSingleDegreeLoveNumber.size( ) ; i++ )
+//    {
+//        int loveNumberDegree = std::dynamic_pointer_cast< SingleDegreeVariableTidalLoveNumber >(
+//                parameters->getVectorParameters( ).at( indicesSingleDegreeLoveNumber.at( i ).second.first ) )->getDegree( );
+//        if ( loveNumberDegree == 2 )
+//        {
+//            indSingleDegreeK2.push_back( indicesSingleDegreeLoveNumber.at( i ) );
+//        }
+////        std::cout << "indSingleDegreeLoveNumber: " << indSingleDegreeLoveNumber.at( i ).first.first << " - " << indSingleDegreeLoveNumber.at( i ).first.second << " at indices: " <<
+////        indSingleDegreeLoveNumber.at( i ).second.first << " & " << indSingleDegreeLoveNumber.at( i ).second.second << "\n\n";
+//    }
+//
+//    std::pair< std::vector< std::pair< std::string, std::string > >, std::vector< std::pair< int, int > > > indFullDegreeLoveNumber =
+//            parameters->getIndicesForParameterType( full_degree_tidal_love_number );
+//    std::vector< std::pair< std::pair< std::string, std::string >, std::pair< int, int > > > indFullDegreeK2;
+//    for ( unsigned int i = 0 ; i < indFullDegreeLoveNumber.size( ) ; i++ )
+//    {
+//        std::shared_ptr< FullDegreeTidalLoveNumber > fullDegreeLoveNumberParameter = std::dynamic_pointer_cast< FullDegreeTidalLoveNumber >(
+//                parameters->getVectorParameters( ).at( indFullDegreeLoveNumber.at( i ).second.first ) );
+//        int loveNumberDegree = fullDegreeLoveNumberParameter->getDegree( );
+////        std::cout << "indFullDegreeLoveNumber: " << indFullDegreeLoveNumber.at( i ).first.first << " - " << indFullDegreeLoveNumber.at( i ).first.second << " at indices: " <<
+////        indFullDegreeLoveNumber.at( i ).second.first << " & " << indFullDegreeLoveNumber.at( i ).second.second << "\n\n";
+////        std::cout << "Love number of degree " << loveNumberDegree << "\n\n";
+//        if ( loveNumberDegree == 2 )
+//        {
+//            indFullDegreeK2.push_back( indFullDegreeLoveNumber.at( i ) );
+//        }
+//    }
+//
+//    std::pair< std::vector< std::pair< std::string, std::string > >, std::vector< std::pair< int, int > > > indTimeLag =
+//            parameters->getIndicesForParameterType( direct_dissipation_tidal_time_lag );
+////    for ( unsigned int i = 0 ; i < indTimeLag.size( ) ; i++ )
+////    {
+////        std::cout << "indTimeLag: " << indTimeLag.at( i ).first.first << " - " << indTimeLag.at( i ).first.second << " at indices: " <<
+////        indTimeLag.at( i ).second.first << " & " << indTimeLag.at( i ).second.second << "\n\n";
+////    }
+//
+//    std::pair< std::vector< std::pair< std::string, std::string > >, std::vector< std::pair< int, int > > > indInvQualityFactor =
+//            parameters->getIndicesForParameterType( inverse_tidal_quality_factor );
+////    for ( unsigned int i = 0 ; i < indInvQualityFactor.size( ) ; i++ )
+////    {
+////        std::cout << "indInvQualityFactor: "<< indInvQualityFactor.at( i ).first.first << " - " << indInvQualityFactor.at( i ).first.second << " at indices: " <<
+////        indInvQualityFactor.at( i ).second.first << " & " << indInvQualityFactor.at( i ).second.second << "\n\n";
+////    }
+//
+//    // Check that the time lag and inverse of the tidal quality factor are not both estimated for the same body.
+//    for ( unsigned int i = 0 ; i < indInvQualityFactor.size( ) ; i++ )
+//    {
+//        for ( unsigned int j = 0 ; j < indTimeLag.size( ) ; j++ )
+//        {
+//            if ( indInvQualityFactor.at( i ).first.first == indTimeLag.at( j ).first.first )
+//            {
+//                throw std::runtime_error( "Error, the inverse of the tidal quality and time lag cannot both be estimated for body "
+//                                          + indInvQualityFactor.at( i ).first.first );
+//            }
+//        }
+//    }
+//
+//
+//    std::vector< Eigen::MatrixXd > globalConstraintsTidalParameters;
+//
+//    // Check if the k2 and inv Q of the same body are estimated
+//    std::vector< int > indicesK2Re, indicesK2Im, indicesInvQ; // indicesParameterConstraints;
+//    for ( unsigned int i = 0 ; i < indFullDegreeK2.size( ) ; i++ )
+//    {
+//        for ( unsigned int j = 0 ; j < indInvQualityFactor.size( ) ; j++ )
+//        {
+//            if ( indFullDegreeK2.at( i ).first.first == indInvQualityFactor.at( j ).first.first )
+//            {
+//                Eigen::MatrixXd constraint = Eigen::MatrixXd::Zero( 1, parameters->getParameterSetSize( ) );
+//
+////                int indexK2Re = indFullDegreeK2.at( i ).second.first;
+////                int indexK2Im = indFullDegreeK2.at( i ).second.first + 1; // TO DO - FIX THIS IN CASE THE IMAGINARY PART IS NOT INCLUDED
+////                int indexInvQ = indInvQualityFactor.at( j ).second.first;
+//
+//                indicesK2Re.push_back( indFullDegreeK2.at( i ).second.first );
+//                indicesK2Im.push_back( indFullDegreeK2.at( i ).second.first + 1 ); // TO DO - FIX THIS IN CASE THE IMAGINARY PART IS NOT INCLUDED
+//                indicesInvQ.push_back( indInvQualityFactor.at( j ).second.first );
+//
+////                double k2Re = parameters->template getFullParameterValues< double >( )[ indexK2Re ];
+////                double k2Im = parameters->template getFullParameterValues< double >( )[ indexK2Im ]; // TO DO - FIX THIS IN CASE THE IMAGINARY PART IS NOT INCLUDED
+////                double k2Full = std::sqrt( k2Re * k2Re + k2Im * k2Im );
+////                double InvQ = parameters->template getFullParameterValues< double >( )[ indexInvQ ];
+////
+////
+////                std::cout << "indexReK2: " << indexK2Re << "\n\n";
+////                std::cout << "indexImK2: " << indexK2Im << "\n\n";
+////                std::cout << "indexInvQ: " << indexInvQ << "\n\n";
+////
+////                std::cout << "ReK2: " << k2Re << "\n\n";
+////                std::cout << "ImK2: " << k2Im << "\n\n";
+////                std::cout << "InvQ: " << InvQ << "\n\n";
+////
+////                // Define constraints
+////                constraint( 0, indexK2Re ) = - ( k2Re * k2Im ) / std::pow( k2Full, 3 );
+////                constraint( 0, indexK2Im ) = ( k2Re * k2Re ) / std::pow( k2Full, 3 );
+////                constraint( 0, indexInvQ ) = - 1.0;
+////
+////                globalConstraintsTidalParameters.push_back( constraint );
+//            }
+//        }
+//    }
+//
+//    std::vector< Eigen::MatrixXd > loveNumbersQualityFactorContraints =
+//            updateLoveNumberTidalQualityFactorConstraints( parameters, indicesK2Re, indicesK2Im, indicesInvQ );
+//
+//
+//    // Check if the k2 and time lag of the same body are estimated
+//    indicesK2Re.clear( );
+//    indicesK2Im.clear( );
+//    std::vector< int > indicesTimeLag;
+//    for ( unsigned int i = 0 ; i < indFullDegreeK2.size( ) ; i++ )
+//    {
+//        for ( unsigned int j = 0 ; j < indTimeLag.size( ) ; j++ )
+//        {
+//            if ( indFullDegreeK2.at( i ).first.first == indTimeLag.at( j ).first.first )
+//            {
+////                Eigen::MatrixXd constraint = Eigen::MatrixXd::Zero( 1, parameters->getParameterSetSize( ) );
+////                int indexK2Re = indFullDegreeK2.at( i ).second.first;
+////                int indexK2Im = indFullDegreeK2.at( i ).second.first + 1;
+////                int indexTimeLag = indTimeLag.at( j ).second.first;
+//
+//                indicesK2Re.push_back( indFullDegreeK2.at( i ).second.first );
+//                indicesK2Im.push_back( indFullDegreeK2.at( i ).second.first + 1 );
+//                indicesTimeLag.push_back( indTimeLag.at( j ).second.first );
+//
+////                double k2Re = parameters->template getFullParameterValues< double >( )[ indexK2Re ];
+////                double k2Im = parameters->template getFullParameterValues< double >( )[ indexK2Im ];
+////                double k2Full = std::sqrt( k2Re * k2Re + k2Im * k2Im );
+////                double invQ = k2Im / k2Full;
+////
+////                double timeLag = parameters->template getFullParameterValues< double >( )[ indexTimeLag ];
+////
+////                 std::cout << "indexReK2: " << indexK2Re << "\n\n";
+////                std::cout << "indexImK2: " << indexK2Im << "\n\n";
+////                std::cout << "indexTimeLag: " << indexTimeLag << "\n\n";
+////
+////                std::cout << "ReK2: " << k2Re << "\n\n";
+////                std::cout << "ImK2: " << k2Im << "\n\n";
+////                std::cout << "timeLag: " << timeLag << "\n\n";
+////
+////                // Define constraints
+////                double multiplyingFactorConstraint = ( timeLag / std::atan( invQ ) )
+////                        * ( k2Full * k2Full ) / ( k2Full * k2Full + k2Im * k2Im );
+////                constraint( 0, indexK2Re ) = - ( k2Re * k2Im ) / std::pow( k2Full, 3 );
+////                constraint( 0, indexK2Im ) = ( k2Re * k2Re ) / std::pow( k2Full, 3 );
+////                constraint( 0, indexTimeLag ) = - 1.0;
+////
+////                globalConstraintsTidalParameters.push_back( multiplyingFactorConstraint * constraint );
+//            }
+//        }
+//    }
+//
+//    std::vector< Eigen::MatrixXd > loveNumbersTimeLagContraints =
+//            updateLoveNumberTidalTimeLagConstraints( parameters, indicesK2Re, indicesK2Im, indicesTimeLag );
+//
+//    globalConstraintsTidalParameters = loveNumbersQualityFactorContraints;
+//    for ( unsigned int i = 0 ; i < loveNumbersTimeLagContraints.size( ) ; i++ )
+//    {
+//        globalConstraintsTidalParameters.push_back( loveNumbersTimeLagContraints.at( i ) );
+//    }
+//
+//
+//    unsigned int nbConstraints = globalConstraintsTidalParameters.size( );
+//    Eigen::MatrixXd fullConstraintMatrix = Eigen::MatrixXd::Zero( nbConstraints, parameters->getParameterSetSize( ) );
+//    for ( unsigned int i = 0 ; i < nbConstraints ; i++ )
+//    {
+//        fullConstraintMatrix.block( i, 0, 1, parameters->getParameterSetSize( ) ) = globalConstraintsTidalParameters[ i ];
+//    }
+//
+//    std::cout << "fullConstraintMatrix: " << "\n\n";
+//    std::cout << fullConstraintMatrix << "\n\n";
+//
+//    parameters->addGlobalConstraint( fullConstraintMatrix );
+//}
+
 //! Function to create the interface object for estimating any number/type of parameters.
 /*!
  *  Function to create the interface object for estimating any number/type of parameters. This can include both
@@ -2074,7 +2343,8 @@ std::shared_ptr< estimatable_parameters::EstimatableParameterSet< InitialStatePa
         const std::shared_ptr< propagators::PropagatorSettings< InitialStateParameterType > > propagatorSettings =
         std::shared_ptr< propagators::PropagatorSettings< InitialStateParameterType > >( ),
         const std::vector< std::shared_ptr< estimatable_parameters::EstimatableParameterSettings > >& considerParameterNames =
-                std::vector< std::shared_ptr< estimatable_parameters::EstimatableParameterSettings > >( ) )
+                std::vector< std::shared_ptr< estimatable_parameters::EstimatableParameterSettings > >( ),
+        const bool deactivateConstraints = false )
 
 {
     using namespace tudat::estimatable_parameters;
@@ -2142,8 +2412,25 @@ std::shared_ptr< estimatable_parameters::EstimatableParameterSet< InitialStatePa
         considerParameters = createParametersToEstimate( considerParameterNames, bodies, propagatorSettings );
     }
 
-    return std::make_shared< EstimatableParameterSet< InitialStateParameterType > >(
-                doubleParametersToEstimate, vectorParametersToEstimate, initialDynamicalParametersToEstimate, considerParameters );
+    std:std::shared_ptr< EstimatableParameterSet< InitialStateParameterType > > parameters = std::make_shared< EstimatableParameterSet< InitialStateParameterType > >(
+        doubleParametersToEstimate, vectorParametersToEstimate, initialDynamicalParametersToEstimate, considerParameters );
+
+//    std::vector< unsigned int > indices;
+//    std::shared_ptr< TidalQualityFactorLoveNumberConstraints< InitialStateParameterType > > tidalFactorLoveNumberConstraints =
+//            std::make_shared< TidalQualityFactorLoveNumberConstraints< InitialStateParameterType > >(
+//                    tidal_quality_factor_single_love_number_constraint, std::make_pair( "", "" ), indices, parameters->template getFullParameterValues< InitialStateParameterType >( ) );
+//    std::shared_ptr< TidalTimeLagLoveNumberConstraints< InitialStateParameterType > > timeLagLoveNumberConstraints =
+//            std::make_shared< TidalTimeLagLoveNumberConstraints< InitialStateParameterType > >(
+//                    tidal_time_lag_single_love_number_constraint, std::make_pair( "", "" ), indices, parameters->template getFullParameterValues< InitialStateParameterType >( ) );
+//    addConstraintsTidalParameters( parameters );
+
+    // Create parameters constraints
+    if ( !deactivateConstraints )
+    {
+        createParameterConstraints( parameters );
+    }
+
+    return parameters;
 }
 
 //! Function to get the multi-arc parameter equivalent of a single-arc initial state parameter

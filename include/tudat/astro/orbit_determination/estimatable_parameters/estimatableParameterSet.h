@@ -26,6 +26,7 @@
 #include "tudat/astro/orbit_determination/estimatable_parameters/estimatableParameter.h"
 #include "tudat/astro/orbit_determination/estimatable_parameters/initialTranslationalState.h"
 #include "tudat/basics/utilities.h"
+#include "tudat/astro/orbit_determination/estimatable_parameters/parameterConstraints.h"
 
 namespace tudat
 {
@@ -63,7 +64,7 @@ public:
               < InitialStateParameterType, Eigen::Dynamic, 1 > > > >( ) ),
               const std::shared_ptr< EstimatableParameterSet< InitialStateParameterType > > considerParameters = nullptr ):
         estimatedDoubleParameters_( estimatedDoubleParameters ), estimatedVectorParameters_( estimatedVectorParameters ), considerParameters_( considerParameters ),
-        totalConstraintSize_( 0 )
+        interParameterConstraintSize_( 0 ), totalConstraintSize_( 0 )
     {
         // Initialize total number of parameters to 0.
         estimatedParameterSetSize_ = 0;
@@ -71,7 +72,7 @@ public:
         initialDynamicalSingleArcStateParameterSize_ = 0;
         initialDynamicalMultiArcStateParameterSize_ = 0;
 
-        // Iterate over all double parameters and add to parameter size.
+        // Iterate over all initial state parameters and add to parameter size.
         for( unsigned int i = 0; i < estimateInitialStateParameters.size( ); i++ )
         {
             if( isDynamicalParameterSingleArc( estimateInitialStateParameters[ i ] ) )
@@ -82,6 +83,7 @@ public:
             {
                 estimateMultiArcInitialStateParameters_.push_back( estimateInitialStateParameters[ i ] );
             }
+            listParameterTypes_.insert( estimateInitialStateParameters[ i ]->getParameterName( ).first );
         }
 
         estimateInitialStateParameters_ = estimateSingleArcInitialStateParameters_;
@@ -94,7 +96,7 @@ public:
             initialStateParameters_[ estimatedParameterSetSize_ ] = estimateSingleArcInitialStateParameters_[ i ];
             parameterIndices_.push_back( std::make_pair( estimatedParameterSetSize_,
                                                          estimateInitialStateParameters_[ i ]->getParameterSize( ) ) );
-            totalConstraintSize_ += estimateInitialStateParameters_[ i ]->getConstraintSize( );
+            interParameterConstraintSize_ += estimateInitialStateParameters_[ i ]->getConstraintSize( );
 
             initialDynamicalSingleArcStateParameterSize_ += estimateSingleArcInitialStateParameters_[ i ]->getParameterSize( );
             initialSingleArcStateParameters_[ estimatedParameterSetSize_ ] = estimateSingleArcInitialStateParameters_[ i ];
@@ -109,6 +111,7 @@ public:
             initialStateParameters_[ estimatedParameterSetSize_ ] = estimateMultiArcInitialStateParameters_[ i ];
             parameterIndices_.push_back( std::make_pair( estimatedParameterSetSize_,
                                                          estimateMultiArcInitialStateParameters_[ i ]->getParameterSize( ) ) );
+            interParameterConstraintSize_ += estimateMultiArcInitialStateParameters_[ i ]->getConstraintSize( );
 
             initialDynamicalMultiArcStateParameterSize_ += estimateMultiArcInitialStateParameters_[ i ]->getParameterSize( );
             initialMultiArcStateParameters_[ estimatedParameterSetSize_ ] = estimateMultiArcInitialStateParameters_[ i ];
@@ -122,28 +125,34 @@ public:
         for( unsigned int i = 0; i < estimatedDoubleParameters_.size( ); i++ )
         {
             doubleParameters_[ estimatedParameterSetSize_ ] = estimatedDoubleParameters_[ i ];
-            totalConstraintSize_ += estimatedDoubleParameters_[ i ]->getConstraintSize( );
+            interParameterConstraintSize_ += estimatedDoubleParameters_[ i ]->getConstraintSize( );
 
             parameterIndices_.push_back( std::make_pair( estimatedParameterSetSize_, 1 ) );
             estimatedParameterSetSize_++;
+
+            listParameterTypes_.insert( estimatedDoubleParameters_[ i ]->getParameterName( ).first );
         }
 
         // Iterate over all vector parameter, add to total number of parameters and set indices in parameterIndices_
         for( unsigned int i = 0; i < estimatedVectorParameters_.size( ); i++ )
         {
             vectorParameters_[ estimatedParameterSetSize_ ] = estimatedVectorParameters_[ i ];
-            totalConstraintSize_ += estimatedVectorParameters_[ i ]->getConstraintSize( );
+            interParameterConstraintSize_ += estimatedVectorParameters_[ i ]->getConstraintSize( );
 
             parameterIndices_.push_back( std::make_pair( estimatedParameterSetSize_,
                                                          estimatedVectorParameters_[ i ]->getParameterSize( ) ) );
             estimatedParameterSetSize_ += estimatedVectorParameters_[ i ]->getParameterSize( );
+
+            listParameterTypes_.insert( estimatedVectorParameters_[ i ]->getParameterName( ).first );
         }
 
         totalParameterSetSize_ = estimatedParameterSetSize_;
+        totalConstraintSize_ = interParameterConstraintSize_;
 
         // Process multi-arc parameters
         multiArcInitialStateParametersPerArc_ = getMultiArcDynamicalStateToEstimatePerArc(
                 estimateMultiArcInitialStateParameters_, bodiesToEstimatePerArc_, multiArcStateParametersSizePerArc_ );
+
     }
 
     //! Function to return the total number of parameter values (including consider parameters)
@@ -304,6 +313,12 @@ public:
             }
 //            std::cout << "after reset vector parameters" << "\n\n";
         }
+
+        // Reset constraints values
+        for ( unsigned int i = 0 ; i < constraints_.size( ) ; i++ )
+        {
+            constraints_.at( i )->updateConstraints( newParameterValues );
+        }
     }
 
     //! Function to retrieve double parameter objects.
@@ -413,6 +428,66 @@ public:
         }
 
         return typeIndices;
+    }
+
+    //! Function to retrieve the start index and size of (a) parameters(s) with a given identifier
+    /*!
+     * Function to retrieve the start index and size of (a) parameters(s) with a given identifier
+     * \param requiredParameterType Parameter type that is to be searched in full list of patameters
+     * \return List of start indices and sizes of parameters corresponding to requiredParameterId
+     */
+    std::pair< std::vector< std::pair< std::string, std::string > >, std::vector< std::pair< int, int > > > getIndicesForParameterType(
+            const EstimatebleParametersEnum requiredParameterType )
+    {
+        std::pair< std::vector< std::pair< std::string, std::string > >, std::vector< std::pair< int, int > > > metadata;
+        std::vector< std::pair< std::string, std::string > > bodyNames;
+        std::vector< std::pair< int, int > > indices;
+
+        for( auto parameterIterator : initialSingleArcStateParameters_ )
+        {
+            if( parameterIterator.second->getParameterName( ).first == requiredParameterType )
+            {
+                std::pair< std::string, std::string > bodiesInvolved = parameterIterator.second->getParameterName( ).second;
+//                typeIndices.push_back( std::make_pair( bodiesInvolved, std::make_pair( parameterIterator.first, parameterIterator.second->getParameterSize( ) ) ) );
+                bodyNames.push_back( bodiesInvolved );
+                indices.push_back( std::make_pair( parameterIterator.first, parameterIterator.second->getParameterSize( ) ) );
+            }
+        }
+
+        for( auto parameterIterator : initialMultiArcStateParameters_ )
+        {
+            if( parameterIterator.second->getParameterName( ).first == requiredParameterType )
+            {
+                std::pair< std::string, std::string > bodiesInvolved = parameterIterator.second->getParameterName( ).second;
+//                typeIndices.push_back( std::make_pair( bodiesInvolved, std::make_pair( parameterIterator.first, parameterIterator.second->getParameterSize( ) ) ) );
+                bodyNames.push_back( bodiesInvolved );
+                indices.push_back( std::make_pair( parameterIterator.first, parameterIterator.second->getParameterSize( ) ) );
+            }
+        }
+
+        for( auto parameterIterator : doubleParameters_ )
+        {
+            if( parameterIterator.second->getParameterName( ).first == requiredParameterType )
+            {
+                std::pair< std::string, std::string > bodiesInvolved = parameterIterator.second->getParameterName( ).second;
+//                typeIndices.push_back( std::make_pair( bodiesInvolved, std::make_pair( parameterIterator.first, parameterIterator.second->getParameterSize( ) ) ) );
+                bodyNames.push_back( bodiesInvolved );
+                indices.push_back( std::make_pair( parameterIterator.first, parameterIterator.second->getParameterSize( ) ) );
+            }
+        }
+
+        for( auto parameterIterator : vectorParameters_ )
+        {
+            if( parameterIterator.second->getParameterName( ).first == requiredParameterType )
+            {
+                std::pair< std::string, std::string > bodiesInvolved = parameterIterator.second->getParameterName( ).second;
+//                typeIndices.push_back( std::make_pair( bodiesInvolved, std::make_pair( parameterIterator.first, parameterIterator.second->getParameterSize( ) ) ) );
+                bodyNames.push_back( bodiesInvolved );
+                indices.push_back( std::make_pair( parameterIterator.first, parameterIterator.second->getParameterSize( ) ) );
+            }
+        }
+
+        return std::make_pair( bodyNames, indices );
     }
 
     //! Function to retrieve the start index and size of a parameter with a given parameter description
@@ -630,11 +705,19 @@ public:
             }
         }
 
+        // NOT NECESSARY ANYMORE
         for( unsigned int i = 0; i < globalConstraints_.size( ); i++ )
         {
             constraintStateMultiplier.block( currentConstraintRow, 0, globalConstraints_.at( i ).rows( ), estimatedParameterSetSize_ ) =
                 globalConstraints_.at( i );
             currentConstraintRow += globalConstraints_.at( i ).rows( );
+        }
+
+        for ( unsigned int i = 0 ; i < constraints_.size( ) ; i++ )
+        {
+            constraintStateMultiplier.block( currentConstraintRow, 0, constraints_.at( i )->getConstraint( ).rows( ), estimatedParameterSetSize_ ) =
+                    constraints_.at( i )->getConstraint( );
+            currentConstraintRow += constraints_.at( i )->getConstraint( ).rows( );
         }
 
         if( currentConstraintRow != totalConstraintSize_ )
@@ -722,6 +805,41 @@ public:
         return globalConstraints_;
     }
 
+    std::vector< std::shared_ptr< ParameterConstraints/*< InitialStateParameterType >*/ > > getConstraints( ) const
+    {
+         return constraints_;
+    }
+
+    // Function to overwrite the existing set of constraints
+    void resetConstraints( const std::vector< std::shared_ptr< ParameterConstraints/*< InitialStateParameterType >*/ > >& constraints )
+    {
+         std::cout << "in function resetConstraints from estimatableParameterSet object" << "\n\n";
+         constraints_.clear( );
+         constraints_ = constraints;
+         totalConstraintSize_ = interParameterConstraintSize_;
+
+         // THIS SHOULD BE CHANGED TO AVOID OVER ESTIMATING THE CONSTRAINT SIZE
+         for ( auto constraint : constraints )
+         {
+             totalConstraintSize_ += constraint->getConstraintSize( );
+         }
+    }
+
+    // Function to add a single constraint to the existing set
+    void addConstraints( const std::vector< std::shared_ptr< ParameterConstraints/*< InitialStateParameterType >*/ > >& extraConstraints )
+    {
+         for ( auto constraint : extraConstraints )
+         {
+             constraints_.push_back( constraint );
+             totalConstraintSize_ += constraint->getConstraintSize( );
+         }
+    }
+
+    std::set< EstimatebleParametersEnum > getListParameterTypes( ) const
+    {
+         return listParameterTypes_;
+    };
+
 
 protected:
 
@@ -780,8 +898,13 @@ protected:
 
     std::vector< Eigen::MatrixXd > globalConstraints_;
 
-    //! Size of linear constraint that is to be applied during estimation
+    //! Total size of linear constraint that is to be applied during estimation, including constraints between different parameters
     int totalConstraintSize_;
+
+    //! Size of linear constraint for inter-parameter constraints only
+    int interParameterConstraintSize_;
+
+    std::vector< std::shared_ptr< ParameterConstraints/*< InitialStateParameterType >*/ > > constraints_;
 
     //! Map containing all single-arc initial state parameter objects, with map key start index of parameter in total vector.
     std::map< int, std::shared_ptr<
@@ -800,6 +923,8 @@ protected:
     //! List of initial multi-arc dynamical states that are to be estimated, for each arc.
     std::map< double, std::vector< std::shared_ptr< EstimatableParameter< Eigen::Matrix< InitialStateParameterType, Eigen::Dynamic, 1 > > > > >
     multiArcInitialStateParametersPerArc_;
+
+    std::set< EstimatebleParametersEnum > listParameterTypes_;
 
 };
 
@@ -872,6 +997,20 @@ void printEstimatableParameterEntries(
     {
         std::cout << "Consider parameters: " << "\n\n";
         printEstimatableParameterEntries( considerParameters );
+    }
+}
+
+
+template< typename InitialStateParameterType >
+void printInterParameterConstraints(
+        const std::shared_ptr< EstimatableParameterSet< InitialStateParameterType > > estimatableParameters )
+{
+    std::cout << "Constraint start index, constraint definition" << "\n\n";
+    unsigned int indexConstraint = 0;
+    for ( auto constraint : estimatableParameters->getConstraints( ) )
+    {
+        std::cout << indexConstraint << ", " << constraint->getConstraintDescription( ) << "\n\n";
+        indexConstraint += constraint->getConstraintSize( );
     }
 }
 

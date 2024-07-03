@@ -139,6 +139,15 @@ bool isParameterTidalProperty( const EstimatebleParametersEnum parameterType );
  */
 bool isParameterArcWiseInitialStateProperty( const EstimatebleParametersEnum parameterType );
 
+//! Function to... // NAME OF THE FUNCTION SHOULD BE CHANGED
+/*!
+ * Function to...
+ * \param parameterType Parameter identifier
+ * \return True if parameter is involved in a constraint
+ */
+bool isParameterPossiblyConstrained( const EstimatebleParametersEnum parameterType );
+
+
 //! Typedef for full parameter identifier.
 typedef std::pair< EstimatebleParametersEnum, std::pair< std::string, std::string > > EstimatebleParameterIdentifier;
 

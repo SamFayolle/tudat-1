@@ -441,6 +441,31 @@ bool isParameterArcWiseInitialStateProperty( const EstimatebleParametersEnum par
     return flag;
 }
 
+//! Function to determine ....
+bool isParameterPossiblyConstrained( const EstimatebleParametersEnum parameterType )
+{
+    bool flag;
+    switch( parameterType )
+    {
+        case single_degree_variable_tidal_love_number:
+            flag = true;
+            break;
+        case full_degree_tidal_love_number:
+            flag = true;
+            break;
+        case inverse_tidal_quality_factor:
+            flag = true;
+            break;
+        case direct_dissipation_tidal_time_lag:
+            flag = true;
+            break;
+        default:
+            flag = false;
+            break;
+    }
+    return flag;
+}
+
 
 
 }

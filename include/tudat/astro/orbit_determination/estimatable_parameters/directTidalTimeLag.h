@@ -66,6 +66,11 @@ public:
         return tidalAccelerationModels_.at( 0 )->getTimeLag( );
     }
 
+    double getTidalPeriod( )
+    {
+        return tidalAccelerationModels_.at( 0 )->getTidalPeriod( );
+    }
+
     //! Function to reset the tidal time lag value
     /*!
      * Function to reset the tidal time lag value

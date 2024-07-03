@@ -176,6 +176,9 @@ std::pair< Eigen::VectorXd, Eigen::MatrixXd > performLeastSquaresAdjustmentFromD
         rightHandSide.segment( numberOfParameters, numberOfConstraints ) = constraintRightHandside;
     }
 
+    std::cout << "inverseOfCovarianceMatrix in perform LSQ function: " << "\n\n";
+    std::cout << inverseOfCovarianceMatrix << "\n\n";
+
     return std::make_pair( solveSystemOfEquationsWithSvd(
             inverseOfCovarianceMatrix, rightHandSide, limitConditionNumberForWarning ), inverseOfCovarianceMatrix );
 
