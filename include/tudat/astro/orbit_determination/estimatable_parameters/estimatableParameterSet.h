@@ -995,7 +995,7 @@ void printEstimatableParameterEntries(
     std::shared_ptr< EstimatableParameterSet< InitialStateParameterType > > considerParameters = estimatableParameters->getConsiderParameters( );
     if ( considerParameters != nullptr )
     {
-        std::cout << "Consider parameters: " << "\n\n";
+        std::cout << "Consider parameters: " << std::endl;
         printEstimatableParameterEntries( considerParameters );
     }
 }
@@ -1005,13 +1005,14 @@ template< typename InitialStateParameterType >
 void printInterParameterConstraints(
         const std::shared_ptr< EstimatableParameterSet< InitialStateParameterType > > estimatableParameters )
 {
-    std::cout << "Constraint start index, constraint definition" << "\n\n";
+    std::cout << "Constraint start index, constraint definition" << std::endl;
     unsigned int indexConstraint = 0;
     for ( auto constraint : estimatableParameters->getConstraints( ) )
     {
-        std::cout << indexConstraint << ", " << constraint->getConstraintDescription( ) << "\n\n";
+        std::cout << indexConstraint << ", " << constraint->getConstraintDescription( ) << std::endl;
         indexConstraint += constraint->getConstraintSize( );
     }
+    std::cout << std::endl;
 }
 
 //! Function to get the list of names of bodies for which initial translational dynamical state is estimated.

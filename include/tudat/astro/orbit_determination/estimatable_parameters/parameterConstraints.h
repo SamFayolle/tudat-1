@@ -26,6 +26,7 @@
 //#include "tudat/astro/orbit_determination/estimatable_parameters/estimatableParameter.h"
 //#include "tudat/astro/orbit_determination/estimatable_parameters/initialTranslationalState.h"
 #include "tudat/basics/utilities.h"
+#include "tudat/math/basic/mathematicalConstants.h"
 
 namespace tudat
 {
@@ -280,12 +281,12 @@ void updateConstraints( const Eigen::VectorXd& newParameterValues )
 //    for ( unsigned int i = 0 ; i < nbK2Values_ ; i++ )
 //    {
         this->constraints_( 0, indexRealLoveNumber_ ) =
-//              ( - k2_.real( ) *  k2_.imag( ) ) / std::pow( normLoveNumber, 3 );
-                0.0;
+              ( - k2_.real( ) *  k2_.imag( ) ) / std::pow( normLoveNumber, 3 );
+//                0.0;
         std::cout << "constraint Re(k2): " << this->constraints_( 0, indexRealLoveNumber_ ) << "\n\n";
         this->constraints_( 0, indexImagLoveNumber_ ) =
-//                ( k2_.real( ) * k2_.real( ) ) / std::pow( normLoveNumber, 3 );
-                1.0;
+                ( k2_.real( ) * k2_.real( ) ) / std::pow( normLoveNumber, 3 );
+//                1.0;
         std::cout << "constraint Im(k2): " << this->constraints_( 0, indexImagLoveNumber_ ) << "\n\n";
 //    }
 //    this->constraints_( 0, indexRealLoveNumber_ ) = 0.0; // - ( effectiveK2_.real( ) *  effectiveK2_.imag( ) ) / std::pow( normLoveNumber, 3 );
@@ -343,8 +344,9 @@ TidalTimeLagLoveNumberConstraints(
         const ParameterConstraintsEnum constraintType,
         const std::vector< std::pair< std::string, std::string > >& involvedBodies,
         const std::vector< std::pair< unsigned int, unsigned int > >& constraintIndices,
-        const Eigen::VectorXd& parameterValues ):
-        ParameterConstraints( constraintType, involvedBodies, constraintIndices, parameterValues )
+        const Eigen::VectorXd& parameterValues,
+        const double tidalPeriod ):
+        ParameterConstraints( constraintType, involvedBodies, constraintIndices, parameterValues ), tidalPeriod_( tidalPeriod )
 {
     std::cout << "in constructor TidalTimeLagLoveNumberConstraints" << "\n\n";
 
@@ -405,12 +407,6 @@ void updateConstraints( const Eigen::VectorXd& newParameterValues )
     std::cout << "indexRealLoveNumber_: " << indexRealLoveNumber_ << "\n\n";
     std::cout << "indexImagLoveNumber_: " << indexImagLoveNumber_ << "\n\n";
 
-    for ( unsigned int i = 0 ; i < this->parameterValues_.size( ) ; i++ )
-    {
-        std::cout << "test ind " << i << ": " << this->parameterValues_[ i ] << "\n\n";
-    }
-
-
 //    // Re-compute effective value for k2
 //    updateEffectiveK2Value( this->parameterValues_ );
     // Re-compute k2
@@ -429,14 +425,16 @@ void updateConstraints( const Eigen::VectorXd& newParameterValues )
     std::cout << "timeLag: " << timeLag << "\n\n";
     std::cout << "normLoveNumber: " << normLoveNumber << "\n\n";
 
+//    std::cout << "indexTimeLag_: " << "\n\n";
+
 
     // update constraints
     this->constraints_ = Eigen::MatrixXd::Zero( this->constraintSize_, this->parameterValues_.size( ) );
 
-    double multiplyingFactor = ( timeLag / std::atan( invQ ) )
-            * 1.0 / ( normLoveNumber * ( k2_.real( ) * k2_.real( ) + 2.0 * k2_.imag( ) * k2_.imag( ) ) );
-//    std::cout << "multiplyingFactor: " << multiplyingFactor << "\n\n";
-//    std::cout << "tidal period: " << ( timeLag / std::atan( invQ ) ) * 2.0 * mathematical_constants::PI << "\n\n";
+    double multiplyingFactor = tidalPeriod_ / ( 2.0 * mathematical_constants::PI ) *
+            1.0 / ( normLoveNumber * ( k2_.real( ) * k2_.real( ) + 2.0 * k2_.imag( ) * k2_.imag( ) ) );
+    std::cout << "multiplyingFactor: " << multiplyingFactor << "\n\n";
+    std::cout << "tidal period: " << ( timeLag / std::atan( invQ ) ) * 2.0 * mathematical_constants::PI << "\n\n";
 
 //    for ( unsigned int i = 0 ; i < nbK2Values_ ; i++ )
 //    {
@@ -473,6 +471,8 @@ private:
 //    std::vector< unsigned int > indicesImagLoveNumbers_;
 //    unsigned int nbK2Values_;
     std::complex< double > k2_;
+
+    double tidalPeriod_;
 
 //    std::complex< double > effectiveK2_;
 

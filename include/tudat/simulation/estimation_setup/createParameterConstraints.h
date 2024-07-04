@@ -366,9 +366,14 @@ void createParameterConstraints(
                             if ( theoreticalInvQValue != invQValue )
                             {
                                 invQ->setParameterValue( theoreticalInvQValue );
-                                std::cerr << "Warning when creating " << constraint << ", the values for k2"
-                                             " and invQ for body " << loveNumber->getParameterName( ).second.first << " (tides caused by body " <<
-                                          loveNumber->getParameterName( ).second.second << ") are inconsistent. InvQ overwritten." << "\n\n";
+                                std::string warning = "Warning when creating constraint " + std::to_string( constraint ) + ", the values for k2 and invQ for body "
+                                        + loveNumber->getParameterName( ).second.first;
+                                if ( !loveNumber->getParameterName( ).second.second.empty( ) )
+                                {
+                                    warning += " (tides caused by body " + loveNumber->getParameterName( ).second.second + ")";
+                                }
+                                warning += " are inconsistent. InvQ overwritten.";
+                                std::cerr << warning << "\n\n";
                             }
                             std::cout << "updated invQ value: " << invQ->getParameterValue( ) << "\n\n";
 
@@ -477,6 +482,8 @@ void createParameterConstraints(
                             double timeLagValue = timeLag->getParameterValue( );
                             double theoreticalInvQValue = k2Value[ 1 ] /
                                     std::sqrt( k2Value[ 0 ] * k2Value[ 0 ] + k2Value[ 1 ] * k2Value[ 1 ] );
+                            std::cout << "theoreticalInvQValue: " << theoreticalInvQValue << "\n\n";
+                            std::cout << "timeLag->getTidalPeriod( ): " <<  timeLag->getTidalPeriod( ) << "\n\n";
                             double theoreticalTimeLagValue = timeLag->getTidalPeriod( ) * std::atan( theoreticalInvQValue ) / ( 2.0 * mathematical_constants::PI );
                             std::cout << "timeLagValue: " << timeLagValue << "\n\n";
                             std::cout << "theoreticalTimeLagValue: " << theoreticalTimeLagValue << "\n\n";
@@ -484,15 +491,20 @@ void createParameterConstraints(
                             if ( theoreticalTimeLagValue != timeLagValue )
                             {
                                 timeLag->setParameterValue( theoreticalTimeLagValue );
-                                std::cerr << "Warning when creating " << constraint << ", the values for k2 "
-                                             "and time lag for body " << loveNumber->getParameterName( ).second.first << " (tides caused by body " <<
-                                          loveNumber->getParameterName( ).second.second << ") are inconsistent. Time lag overwritten." << "\n\n";
+                                std::string warning = "Warning when creating constraint " + std::to_string( constraint ) + ", the values for k2 and time lag for body "
+                                                      + loveNumber->getParameterName( ).second.first;
+                                if ( !loveNumber->getParameterName( ).second.second.empty( ) )
+                                {
+                                    warning += " (tides caused by body " + loveNumber->getParameterName( ).second.second + ")";
+                                }
+                                warning += " are inconsistent. Time lag overwritten.";
+                                std::cerr << warning << "\n\n";
                             }
                             std::cout << "updated time lag value: " << timeLag->getParameterValue( ) << "\n\n";
 
                             parameterConstraints.push_back( std::make_shared< TidalTimeLagLoveNumberConstraints >(
                                     constraint, constrainedBodies, constraintIndices,
-                                    parameters->template getFullParameterValues< InitialStateParameterType >( ) ) );
+                                    parameters->template getFullParameterValues< InitialStateParameterType >( ), timeLag->getTidalPeriod( ) ) );
                             break;
                         }
                         default:
