@@ -28,6 +28,7 @@ set(propagation_HEADERS
         setNumericallyIntegratedStates.h
         environmentUpdater.h
         dependentVariablesInterface.h
+        createGravityDeformationModels.h
         )
 
 # Add header files.
@@ -45,6 +46,7 @@ set(propagation_SOURCES
         propagationOutput.cpp
         environmentUpdater.cpp
         dependentVariablesInterface.cpp
+        createGravityDeformationModels.cpp
         )
 
 # Add library.

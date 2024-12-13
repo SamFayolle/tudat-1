@@ -150,3 +150,8 @@ TUDAT_ADD_TEST_CASE(PolyhedronFunctions
 TUDAT_ADD_TEST_CASE(DateTime
         PRIVATE_LINKS
         tudat_basic_astrodynamics)
+
+TUDAT_ADD_TEST_CASE(GravityDeformationModel
+        PRIVATE_LINKS
+        tudat_basic_astrodynamics
+        )
