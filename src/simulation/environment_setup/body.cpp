@@ -73,6 +73,7 @@ Eigen::Matrix< long double, 6, 1 > Body::getTemplatedState( )
 template< >
 void Body::setTemplatedState( const Eigen::Matrix< double, 6, 1 >& state )
 {
+    std::cout << "setTemplatedState " << state.transpose( ) << std::endl;
     setState( state );
 }
 

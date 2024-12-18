@@ -59,6 +59,7 @@ set(propagators_HEADERS
         "stateDerivativeCircularRestrictedThreeBodyProblem.h"
         "getZeroProperModeRotationalInitialState.h"
         "propagateCovariance.h"
+        "gravityDerivative.h"
         )
 
 TUDAT_ADD_LIBRARY("propagators"

@@ -30,6 +30,8 @@
 #include "tudat/astro/propulsion/massRateFromThrust.h"
 #include "tudat/astro/electromagnetism/radiationPressureAcceleration.h"
 #include "tudat/astro/electromagnetism/yarkovskyAcceleration.h"
+#include "tudat/astro/basic_astro/gravityDeformationModel.h"
+#include "tudat/simulation/propagation_setup/gravityDeformationSettings.h"
 
 namespace tudat
 {
@@ -112,6 +114,10 @@ AvailableAcceleration getAccelerationModelType(
  */
 AvailableMassRateModels getMassRateModelType(
         const std::shared_ptr< MassRateModel > massRateModel );
+
+//! Function to identify the type of a gravity deformation model.
+simulation_setup::GravityDeformationType getGravityDeformationModelType(
+        const std::shared_ptr< basic_astrodynamics::GravityDeformationModel > gravityDeformationModel );
 
 // Function to get all acceleration models of a given type from a list of models
 /*

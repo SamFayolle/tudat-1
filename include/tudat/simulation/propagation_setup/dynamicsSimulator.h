@@ -708,6 +708,8 @@ public:
             createAndSetIntegratedStateProcessors( );
         }
 
+        std::cout << "in single arc dynamics simulator constructor" << std::endl;
+
         // Create object that updates the environment during propagation
         try
         {

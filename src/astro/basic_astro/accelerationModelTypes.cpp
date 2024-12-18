@@ -243,6 +243,26 @@ AvailableMassRateModels getMassRateModelType(
     return massRateType;
 }
 
+//! Function to identify the type of a gravity deformation model.
+simulation_setup::GravityDeformationType getGravityDeformationModelType(
+        const std::shared_ptr< GravityDeformationModel > gravityDeformationModel )
+{
+    // Nominal type is undefined
+    simulation_setup::GravityDeformationType gravityDeformationType;
+
+    // Check for each gravity deformation model type implemented as AvailableMassRateModels.
+    if( std::dynamic_pointer_cast< MaxwellGravityDeformationModel >( gravityDeformationModel ) != nullptr )
+    {
+        gravityDeformationType = simulation_setup::maxwell_deformation;
+    }
+    else
+    {
+        throw std::runtime_error(
+                    "Error, gravity deformation model not identified when getting gravity deformation model type." );
+    }
+    return gravityDeformationType;
+}
+
 //! Function to get all acceleration models of a given type from a list of models
 std::vector< std::shared_ptr< AccelerationModel3d > > getAccelerationModelsOfType(
         const std::vector< std::shared_ptr< AccelerationModel3d > >& fullList,

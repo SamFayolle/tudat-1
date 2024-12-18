@@ -33,7 +33,8 @@ enum IntegratedStateType
     translational_state = 1,
     rotational_state = 2,
     body_mass_state = 3,
-    custom_state = 4
+    custom_state = 4,
+    gravity_deformation_state = 5
 };
 
 std::string getIntegratedStateTypString( const IntegratedStateType stateType );

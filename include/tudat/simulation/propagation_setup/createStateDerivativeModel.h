@@ -36,6 +36,7 @@
 #include "tudat/astro/propagators/stateDerivativeCircularRestrictedThreeBodyProblem.h"
 #include "tudat/simulation/environment_setup/body.h"
 #include "tudat/math/integrators/createNumericalIntegrator.h"
+#include "tudat/astro/propagators/gravityDerivative.h"
 
 namespace tudat
 {
@@ -354,6 +355,23 @@ std::shared_ptr< SingleStateTypeDerivative< StateScalarType, TimeType > > create
                 massPropagatorSettings->bodiesWithMassToPropagate_ );
 }
 
+//! Function to create a gravity state derivative model.
+/*!
+ *  Function to create a gravity state derivative model from propagation settings and environment.
+ *  \param massPropagatorSettings Settings for the mass dynamics model.
+ *  \param bodies List of body objects in the environment
+ *  \return Mass state derivative model.
+ */
+template< typename StateScalarType = double, typename TimeType = double >
+std::shared_ptr< SingleStateTypeDerivative< StateScalarType, TimeType > > createGravityStateDerivativeModel(
+        const std::shared_ptr< GravityDeformationPropagatorSettings< StateScalarType, TimeType > > gravityPropagatorSettings,
+        const  simulation_setup::SystemOfBodies& bodies )
+{
+    return std::make_shared< propagators::GravityStateDerivative< StateScalarType, TimeType > >(
+                gravityPropagatorSettings->getGravityDeformationModelsMap( ),
+                gravityPropagatorSettings->bodiesWithGravityToPropagate_ );
+}
+
 //! Function to create a state derivative model.
 /*!
  *  Function to create a state derivative model from propagation settings and the environment.
@@ -442,6 +460,23 @@ createStateDerivativeModel(
         {
             stateDerivativeModel = std::make_shared< CustomStateDerivative< StateScalarType, TimeType > >(
                         customPropagatorSettings->stateDerivativeFunction_, customPropagatorSettings->stateSize_ );
+        }
+        break;
+    }
+    case gravity_deformation_state:
+    {
+        // Check input consistency.
+        std::shared_ptr< GravityDeformationPropagatorSettings< StateScalarType, TimeType > > gravityPropagatorSettings =
+                std::dynamic_pointer_cast< GravityDeformationPropagatorSettings< StateScalarType, TimeType > >( propagatorSettings );
+        if( gravityPropagatorSettings == nullptr )
+        {
+            throw std::runtime_error(
+                        "Error, expected gravity propagation settings when making state derivative model" );
+        }
+        else
+        {
+            stateDerivativeModel = createGravityStateDerivativeModel< StateScalarType, TimeType >(
+                        gravityPropagatorSettings, bodies );
         }
         break;
     }
