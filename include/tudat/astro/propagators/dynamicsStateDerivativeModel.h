@@ -145,6 +145,7 @@ public:
      */
     StateType computeStateDerivative( const TimeType time, const StateType& state )
     {
+        // std::cout << "in compute state derivative" << std::endl;
 
         if( !( time == time ) )
         {
@@ -520,6 +521,8 @@ public:
             case body_mass_state:
                 break;
             case custom_state:
+                break;
+            case gravity_deformation_state:
                 break;
             default:
                 throw std::runtime_error( "Error when updating state derivative model settings, did not recognize dynamics type" );

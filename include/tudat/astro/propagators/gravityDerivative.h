@@ -33,7 +33,7 @@ namespace propagators
  *  Class for computing the derivative of the gravity field of a set of bodies. 
  */
 template< typename StateScalarType = double, typename TimeType = double >
-class GravityDerivative: public propagators::SingleStateTypeDerivative< StateScalarType, TimeType >
+class GravityStateDerivative: public propagators::SingleStateTypeDerivative< StateScalarType, TimeType >
 {
 public:
 
@@ -44,7 +44,7 @@ public:
      * \param massRateModels Map of model per body that is to be used for the gravity deformation computation.
      * \param bodiesToIntegrate List of bodies for which the gravity coefficients are to be propagated.
      */
-    GravityDerivative(
+    GravityStateDerivative(
             const std::map< std::string, std::shared_ptr< basic_astrodynamics::GravityDeformationModel > >& gravityDeformationModels,
             const std::vector< std::string >& bodiesToIntegrate ):
         propagators::SingleStateTypeDerivative< StateScalarType, TimeType >( propagators::gravity_deformation_state ),
@@ -76,7 +76,7 @@ public:
      * \param massRateModels Map of models per body that are to be used for the gravity deformation computation.
      * \param bodiesToIntegrate List of bodies for which the gravity coefficients are to be propagated. 
      */
-    GravityDerivative(
+    GravityStateDerivative(
             const std::map< std::string, std::vector< std::shared_ptr< basic_astrodynamics::GravityDeformationModel > > >&
             gravityDeformationModels,
             const std::vector< std::string >& bodiesToIntegrate ):
@@ -97,11 +97,11 @@ public:
 
 
     //! Destructor
-    virtual ~GravityDerivative( ){ }
+    virtual ~GravityStateDerivative( ){ }
 
-    //! Calculates the state derivative of the system of equations for the gravity field deformations
+    //! Calculates the state derivative of the system of equations for the gravity field coefficients
     /*!
-     * Calculates the state derivative of the system of equations for the gravity field deformations
+     * Calculates the state derivative of the system of equations for the gravity field coefficients
      * The environment and gravity deformation models (updateStateDerivativeModel) must be
      * updated before calling this function.
      * \param time Time at which the state derivative is to be calculated.
@@ -125,8 +125,9 @@ public:
             stateDerivative( currentIndex, 0 ) = 0.0;
             for( unsigned int i = 0; i < gravityDeformationModelIterator_->second.size( ); i++ )
             {
-                stateDerivative( currentIndex, 0 ) += static_cast< StateScalarType >(
-                            gravityDeformationModelIterator_->second.at ( i )->getDeformation( ) );
+                // gravityDeformationModelIterator_->second.at ( i )->updateMembers( );
+                stateDerivative.block( currentIndex * 3, 0, 3, 1 ) +=
+                            gravityDeformationModelIterator_->second.at ( i )->getDeformation( );
                 currentIndex++;
             }
 
@@ -179,15 +180,38 @@ public:
             const Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 >& internalSolution, const TimeType& time,
             Eigen::Block< Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 > > currentCartesianLocalSoluton )
     {
-        currentCartesianLocalSoluton = internalSolution;
+        unsigned int counter = 0;
+        for ( auto it : gravityDeformationModels_ )
+        {
+            Eigen::Vector3d transientCoefficients = internalSolution.block( counter * 3, 0, 3, 1 );
+            std::shared_ptr< basic_astrodynamics::MaxwellGravityDeformationModel > maxwellModel = std::dynamic_pointer_cast< basic_astrodynamics::MaxwellGravityDeformationModel >( it.second.at( 0 ) );
+            double timeDouble = double( time );
+            currentCartesianLocalSoluton.block( 3*counter, 0, 3, 1 ) = maxwellModel->computeCurrentNominalCoefficients( transientCoefficients );    
+            counter += 1;
+        }
+        // this->convertToOutputSolution( internalSolution, time, currentCartesianLocalSoluton );
     }
 
     //! Function included for compatibility purposes with base class, input and output representation is equal for gravity 
     //! deformation rate model. Function returns input outputSolution.
-    virtual Eigen::Matrix< StateScalarType, Eigen::Dynamic, Eigen::Dynamic > convertFromOutputSolution(
+    Eigen::Matrix< StateScalarType, Eigen::Dynamic, Eigen::Dynamic > convertFromOutputSolution(
             const Eigen::Matrix< StateScalarType, Eigen::Dynamic, Eigen::Dynamic >& outputSolution, const TimeType& time )
     {
-        return outputSolution;
+        Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 > nominalCoefficients = outputSolution;
+    
+        Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 > transientCoefficients = Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 >::Zero( nominalCoefficients.size( ), 1 );
+
+        unsigned int counter = 0;
+        for ( auto it : gravityDeformationModels_ )
+        {
+            std::shared_ptr< basic_astrodynamics::MaxwellGravityDeformationModel > maxwellModel = std::dynamic_pointer_cast< basic_astrodynamics::MaxwellGravityDeformationModel >( it.second.at( 0 ) );
+            double timeDouble = double( time );
+            transientCoefficients.block( 3*counter, 0, 3, 1 ) = maxwellModel->computeTransientCoefficients( nominalCoefficients, timeDouble );    
+            counter += 1;
+        }
+
+        // std::cout << "in convertFromOutputSolution : transientCoefficients " << transientCoefficients.transpose( ) << std::endl;
+        return transientCoefficients;
     }
 
     //! Function included for compatibility purposes with base class, input and output representation is equal for gravity 
@@ -195,9 +219,21 @@ public:
     void convertToOutputSolution(
             const Eigen::Matrix< StateScalarType, Eigen::Dynamic, Eigen::Dynamic >& internalSolution,
             const TimeType& time,
-            Eigen::Block< Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 > > currentCartesianLocalSoluton )
+            Eigen::Block< Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 > > currentCartesianLocalSolution )
     {
-        currentCartesianLocalSoluton = internalSolution;
+
+        unsigned int counter = 0;
+        for ( auto it : gravityDeformationModels_ )
+        {
+            Eigen::Vector3d transientCoefficients = internalSolution.block( counter * 3, 0, 3, 1 );
+            std::shared_ptr< basic_astrodynamics::MaxwellGravityDeformationModel > maxwellModel = std::dynamic_pointer_cast< basic_astrodynamics::MaxwellGravityDeformationModel >( it.second.at( 0 ) );
+            double timeDouble = double( time );
+            currentCartesianLocalSolution.block( 3*counter, 0, 3, 1 ) = maxwellModel->computeNominalCoefficients( transientCoefficients, timeDouble );    
+            counter += 1;
+        }
+
+        // std::cout << "in convertToOutputSolution : nominalCoefficients " << currentCartesianLocalSolution.transpose( ) << std::endl;
+        // currentCartesianLocalSolution = nominalCoefficients;
     }
 
     //! Function to get the total size of the state of propagated gravity coefficients.
@@ -206,9 +242,9 @@ public:
      * Equal to number of bodies for which the gravity coefficients are propagated.
      * \return Size of propagated gravity coefficients.
      */
-    virtual int getConventionalStateSize( )
+    int getConventionalStateSize( )
     {
-        return bodiesToIntegrate_.size( );
+        return 3 * bodiesToIntegrate_.size( );
     }
 
     //! Get list of bodies for which the gravity coefficients are to be propagated.
@@ -254,6 +290,11 @@ public:
     std::map< std::string, std::vector< std::shared_ptr< basic_astrodynamics::GravityDeformationModel > > > getGravityDeformationModels( )
     {
         return gravityDeformationModels_;
+    }
+
+    bool isStateToBePostProcessed( )
+    {
+        return true;
     }
 
 private:

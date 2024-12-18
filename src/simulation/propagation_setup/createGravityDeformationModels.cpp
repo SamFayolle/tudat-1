@@ -28,26 +28,25 @@ using namespace electromagnetism;
 using namespace ephemerides;
 
 
-//! Function to create spherical harmonic gravity acceleration model.
 std::shared_ptr< basic_astrodynamics::MaxwellGravityDeformationModel >
 createMaxwellGravityFieldDeformationModel(
-        const std::shared_ptr< Body > deformingBody,
-        const std::shared_ptr< Body > perturbingBody,
+        const std::shared_ptr< simulation_setup::Body > deformingBody,
+        const std::shared_ptr< simulation_setup::Body > perturbingBody,
         const std::string& nameOfDeformingBody,
         const std::string& nameOfPerturbingBody,
-        const std::shared_ptr< GravityDeformationSettings > deformationSettings )
-{
+        const std::shared_ptr< GravityDeformationSettings > deformationSettings ) 
+{ 
     // Declare pointer to return object
     std::shared_ptr< MaxwellGravityDeformationModel > deformationModel;
 
     // Dynamic cast deformation settings to required type and check consistency.
-    std::shared_ptr< MaxwellGravityDeformationSettings > maxwellDeformationSettings =
-            std::dynamic_pointer_cast< MaxwellGravityDeformationSettings >( deformationSettings );
+    std::shared_ptr< MaxwellDeformationSettings > maxwellDeformationSettings =
+            std::dynamic_pointer_cast< MaxwellDeformationSettings >( deformationSettings );
     if( maxwellDeformationSettings == nullptr )
     {
         throw std::runtime_error( 
             std::string( "Error, deformation settings inconsistent ") + " making maxwell gravity deformation of " 
-            + nameOfBodyExertingAcceleration + " on " + nameOfBodyUndergoingAcceleration );
+            + nameOfDeformingBody + " due to " + nameOfPerturbingBody );
     }
     else
     {
@@ -73,6 +72,10 @@ createMaxwellGravityFieldDeformationModel(
             // Create gravity deformation object.
             deformationModel = std::make_shared< MaxwellGravityDeformationModel >(
                     std::bind( &Body::getPositionByReference, deformingBody, std::placeholders::_1 ),
+                    std::bind( &Body::getPositionInBaseFrameFromEphemeris< double, double >, deformingBody, std::placeholders::_1 ),
+                    std::bind( &Body::getPositionInBaseFrameFromEphemeris< double, double >, perturbingBody, std::placeholders::_1 ),
+                    std::bind( &Body::getRotationToBaseFrameFromEphemeris< double >, deformingBody, std::placeholders::_1 ),
+                    nameOfPerturbingBody,
                     maxwellDeformationSettings->maxwellRelaxationTime_,
                     maxwellDeformationSettings->globalRelaxationTime_,
                     sphericalHarmonicsGravityField->getGravitationalParameter( ),
@@ -80,7 +83,6 @@ createMaxwellGravityFieldDeformationModel(
                     sphericalHarmonicsGravityField->getReferenceRadius( ),
                     maxwellDeformationSettings->rotationRate_,
                     maxwellDeformationSettings->loveNumber_,
-                    sphericalHarmonicsGravityField->getReferenceRadius( ),
                     std::bind( &SphericalHarmonicsGravityField::getCosineCoefficientsBlock,
                                 sphericalHarmonicsGravityField,
                                 maxwellDeformationSettings->maximumDegree_,
@@ -90,11 +92,11 @@ createMaxwellGravityFieldDeformationModel(
                                 maxwellDeformationSettings->maximumDegree_,
                                 maxwellDeformationSettings->maximumOrder_ ),
                     std::bind( &Body::getPositionByReference, perturbingBody, std::placeholders::_1 ),
-                    std::bind( &Body::getCurrentRotationToGlobalFrame, perturbingBody ) );
+                    std::bind( &Body::getCurrentRotationToGlobalFrame, deformingBody ) );
         }
     }
     return deformationModel;
-}
+};
 
 // //! Function to create acceleration model object.
 // std::shared_ptr< AccelerationModel< Eigen::Vector3d > > createAccelerationModel(
@@ -216,6 +218,39 @@ createMaxwellGravityFieldDeformationModel(
 //     }
 //     return accelerationModelPointer;
 // }
+
+//! Function to create a list of mass rate models for a list of bodies.
+basic_astrodynamics::GravityDeformationModelMap createGravityDeformationModelsMap(
+        const SystemOfBodies& bodies,
+        const SelectedGravityDeformationModelMap& gravityDeformationSettings )
+{
+    // Iterate over all bodies
+    std::map< std::string, std::vector< std::shared_ptr< basic_astrodynamics::GravityDeformationModel > > > gravityDeformationModels;
+    for( std::map< std::string, std::vector< std::shared_ptr< GravityDeformationSettings > > >::const_iterator settingsIterator =
+         gravityDeformationSettings.begin( ); settingsIterator != gravityDeformationSettings.end( ); settingsIterator++)
+    {
+        // Iterate over all mass model settings for current body.
+        for( unsigned int i = 0; i < settingsIterator->second.size( ); i++ )
+        {
+            switch ( settingsIterator->second.at( i )->deformationType_ )
+            {
+            case maxwell_deformation:
+            {
+                std::shared_ptr< MaxwellDeformationSettings > maxwellDeformationSettings = std::dynamic_pointer_cast< MaxwellDeformationSettings >( settingsIterator->second.at( i ) );
+                std::string deformingBody = settingsIterator->first;
+                std::string perturbingBody = maxwellDeformationSettings->perturbingBody_;
+                gravityDeformationModels[ settingsIterator->first ].push_back( createMaxwellGravityFieldDeformationModel( bodies.at( deformingBody ), bodies.at( perturbingBody ),
+                deformingBody, perturbingBody, settingsIterator->second.at( i ) ) );
+                break;
+            }
+            default:
+                break;
+            }
+        }
+    }
+    return gravityDeformationModels;
+
+}
 
 } // namespace simulation_setup
 

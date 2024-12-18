@@ -639,6 +639,7 @@ public:
     template<typename StateScalarType = double, typename TimeType = double>
     void setStateFromEphemeris(const TimeType &time)
     {
+        std::cout << "set state from ephemeris " << time << std::endl;
         if (!(static_cast<Time>(time) == timeOfCurrentState_))
         {
             if( bodyEphemeris_ == nullptr )
@@ -1020,6 +1021,22 @@ public:
         }
     }
 
+    //! Templated function to get the current state of the body from its ephemeris and
+    //! global-to-ephemeris-frame function.
+    /*!
+     * Templated function to get the current state of the body from its ephemeris and
+     * global-to-ephemeris-frame function.  It calls the setStateFromEphemeris state, resetting the currentState_ /
+     * currentLongState_ variables, and returning the state with the requested precision
+     * \param time Time at which to evaluate states.
+     * \return State at requested time
+     */
+    template<typename TimeType = double>
+    Eigen::Quaterniond getRotationToBaseFrameFromEphemeris( const TimeType time )
+    {
+        setCurrentRotationalStateToLocalFrameFromEphemeris< TimeType >( time );
+        return currentRotationToGlobalFrame_;
+    }
+
     //! Get current rotational state.
     /*!
      *  Get current rotational state, expressed as a quaternion from global to body-fixed frame
@@ -1308,6 +1325,39 @@ public:
             const std::shared_ptr<gravitation::GravityFieldVariationsSet>
             gravityFieldVariationSet) {
         gravityFieldVariationSet_ = gravityFieldVariationSet;
+    }
+
+    void setCurrentPropagatedGravityField(const Eigen::VectorXd gravityCoefficients )
+    {
+        double C20 = gravityCoefficients[ 0 ];
+        double C22 = gravityCoefficients[ 1 ];
+        double S22 = gravityCoefficients[ 2 ];
+        // if( gravityFieldModel_ == nullptr )
+        // {
+        //     gravityFieldModel_ = std::make_shared< SphericalHarmonicsGravityField >( const double gravitationalParameter,
+        //     const double referenceRadius,
+        //     const Eigen::MatrixXd& cosineCoefficients = Eigen::MatrixXd::Identity( 1, 1 ),
+        //     const Eigen::MatrixXd& sineCoefficients = Eigen::MatrixXd::Zero( 1, 1 ) );
+        // }
+        // else
+        // {
+            // ADD WARNING!
+            std::shared_ptr< gravitation::SphericalHarmonicsGravityField > sphericalHarmonicsModel = 
+                std::dynamic_pointer_cast< gravitation::SphericalHarmonicsGravityField >( gravityFieldModel_ );
+            if ( sphericalHarmonicsModel == nullptr )
+            {
+                throw std::runtime_error( "Error when setting current propagated gravity field, should be a "
+                    " spherical harmonics expansion model" );
+            }
+            Eigen::MatrixXd cosineCoefficients = sphericalHarmonicsModel->getCosineCoefficients( );
+            Eigen::MatrixXd sineCoefficients = sphericalHarmonicsModel->getSineCoefficients( );
+            cosineCoefficients( 2, 0 ) = C20;
+            cosineCoefficients( 2, 2 ) = C22;
+            sineCoefficients( 2, 2 ) = S22;
+            sphericalHarmonicsModel->setCosineCoefficients( cosineCoefficients );
+            sphericalHarmonicsModel->setSineCoefficients( sineCoefficients );
+
+        // }
     }
 
     //! Function to get the gravity field model of the body.

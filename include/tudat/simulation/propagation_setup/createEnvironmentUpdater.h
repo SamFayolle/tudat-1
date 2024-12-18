@@ -84,6 +84,18 @@ createMassPropagationEnvironmentUpdaterSettings(
         const std::map< std::string, std::vector< std::shared_ptr< basic_astrodynamics::MassRateModel > > > massRateModels,
         const simulation_setup::SystemOfBodies& bodies );
 
+//! Get list of required environment model update settings from gravity deformation models.
+/*!
+ * Get list of required environment model update settings from gravity deformation models.
+ * \param massRateModels List of gravity deformation models used in simulation.
+ * \param bodies List of body objects used in the simulations.
+ * \return List of required environment model update settings.
+ */
+std::map< propagators::EnvironmentModelsToUpdate, std::vector< std::string > >
+createGravityPropagationEnvironmentUpdaterSettings(
+        const std::map< std::string, std::vector< std::shared_ptr< basic_astrodynamics::GravityDeformationModel > > > gravityDeformationModels,
+        const simulation_setup::SystemOfBodies& bodies );
+
 //! Function to update environment to allow all required updates to be made
 /*!
  * Function to update environment to allow all required updates to be made. It checks whether a flight conditions object needs to
@@ -218,6 +230,13 @@ std::vector< std::string > > createEnvironmentUpdaterSettings(
     {
         break;
     }
+    case gravity_deformation_state:
+    {
+        environmentModelsToUpdate = createGravityPropagationEnvironmentUpdaterSettings(
+                    std::dynamic_pointer_cast< GravityDeformationPropagatorSettings< StateScalarType, TimeType > >(
+                        propagatorSettings )->getGravityDeformationModelsMap( ), bodies );
+        break;
+    }
     default:
     {
         throw std::runtime_error( "Error, cannot create environment updates for type " +
@@ -244,6 +263,15 @@ std::vector< std::string > > createEnvironmentUpdaterSettings(
                     environmentModelsToUpdate, getIntegratedTypeAndBodyList( propagatorSettings ) );
         checkValidityOfRequiredEnvironmentUpdates( environmentModelsToUpdate, bodies );
     }
+
+    for ( auto it : environmentModelsToUpdate )
+        { 
+                for ( unsigned int i = 0 ; i < it.second.size( ) ; i++  )
+                {
+                        std::cout << it.first << " - " << it.second.at( i ) << std::endl;
+                }
+        }                
+        std::cout << "environmentModelsToUpdate: " << environmentModelsToUpdate.size( ) << std::endl;
 
     return environmentModelsToUpdate;
 

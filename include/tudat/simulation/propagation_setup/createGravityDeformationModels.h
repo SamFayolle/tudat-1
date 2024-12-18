@@ -17,6 +17,8 @@
 #include <functional>
 
 #include "tudat/astro/basic_astro/gravityDeformationModel.h"
+#include "tudat/simulation/environment_setup/body.h"
+#include "tudat/simulation/propagation_setup/gravityDeformationSettings.h"
 
 namespace tudat
 {
@@ -24,69 +26,9 @@ namespace tudat
 namespace simulation_setup
 {
 
-enum GravityDeformationType
-{
-     maxwell_deformation = 0;
-}
-
-// Class for providing settings for gravity deformation models.
-/*
- *  Class for providing settings for gravity deformation models.
- */
-class GravityDeformationSettings
-{
-public:
-
-    // Constructor, sets type of deformation.
-    /*
-     *  Constructor, sets type of deformation.
-     *  \param deformationType Type of acceleration from GravityDeformationType enum.
-     */
-    GravityDeformationSettings( const basic_astrodynamics::GravityDeformationType deformationType ):
-        deformationType_( deformationType ){ }
-
-    // Destructor.
-    virtual ~GravityDeformationSettings( ){ }
-
-    // Type of acceleration from AvailableAcceleration enum.
-    GravityDeformationType deformationType_;
-
-};
-
-class MaxwellDeformationSettings: public GravityDeformationSettings
-{
-public:
-
-    // Constructor, sets type of acceleration.
-    /*
-     *  Constructor, sets type of acceleration.
-     *  \param accelerationType Type of acceleration from AvailableAcceleration enum.
-     */
-    MaxwellDeformationSettings( 
-        const double maxwellRelaxationTime, 
-        const double globalRelaxationTime,
-        const double loveNumber,
-        const double rotationRate,
-        const int maximumDegree,
-        const int maximumOrder ):
-        GravityDeformationSettings( maxwell_deformation ), maxwellRelaxationTime_( maxwellRelaxationTime ),
-        globalRelaxationTime_( globalRelaxationTime ), loveNumber_( loveNumber ), rotationRate_( rotationRate ),
-        maximumDegree_( maximumDegree ), maximumOrder_( maximumOrder )
-        {
-            
-        }
-
-    // Destructor.
-    virtual ~MaxwellDeformationSettings( ){ }
-
-    const double maxwellRelaxationTime_;
-    const double globalRelaxationTime_;
-    const double loveNumber_;
-    const double rotationRate_;
-    const int maximumDegree_;
-    const int maximumOrder_;
-
-};
+using namespace basic_astrodynamics;
+using namespace gravitation;
+using namespace ephemerides;
 
 
 //! Function to create Maxwell gravity deformation model.
@@ -101,11 +43,73 @@ public:
  */
 std::shared_ptr< basic_astrodynamics::MaxwellGravityDeformationModel >
 createMaxwellGravityFieldDeformationModel(
-        const std::shared_ptr< Body > deformingBody,
-        const std::shared_ptr< Body > perturbingBody,
+        const std::shared_ptr< simulation_setup::Body > deformingBody,
+        const std::shared_ptr< simulation_setup::Body > perturbingBody,
         const std::string& nameOfDeformingBody,
         const std::string& nameOfPerturbingBody,
-        const std::shared_ptr< GravityDeformationSettings > deformationSettings );
+        const std::shared_ptr< GravityDeformationSettings > deformationSettings ); 
+
+basic_astrodynamics::GravityDeformationModelMap createGravityDeformationModelsMap(
+        const SystemOfBodies& bodies,
+        const SelectedGravityDeformationModelMap& gravityDeformationSettings );        
+// { 
+//     // Declare pointer to return object
+//     std::shared_ptr< MaxwellGravityDeformationModel > deformationModel;
+
+//     // Dynamic cast deformation settings to required type and check consistency.
+//     std::shared_ptr< MaxwellDeformationSettings > maxwellDeformationSettings =
+//             std::dynamic_pointer_cast< MaxwellDeformationSettings >( deformationSettings );
+//     if( maxwellDeformationSettings == nullptr )
+//     {
+//         throw std::runtime_error( 
+//             std::string( "Error, deformation settings inconsistent ") + " making maxwell gravity deformation of " 
+//             + nameOfDeformingBody + " due to " + nameOfPerturbingBody );
+//     }
+//     else
+//     {
+//         // Get pointer to gravity field and rotational ephemeris of deforming body and cast to required type.
+//         std::shared_ptr< SphericalHarmonicsGravityField > sphericalHarmonicsGravityField =
+//             std::dynamic_pointer_cast< SphericalHarmonicsGravityField >( deformingBody->getGravityFieldModel( ) );
+
+//         std::shared_ptr< RotationalEphemeris> rotationalEphemeris = deformingBody->getRotationalEphemeris( );
+//         if( sphericalHarmonicsGravityField == nullptr )
+//         {
+//             throw std::runtime_error(
+//                         std::string( "Error, spherical harmonic gravity field model not set when ")
+//                         + " creating Maxwell gravity deformation model of " + nameOfDeformingBody );
+//         }
+//         else
+//         {
+//             if( rotationalEphemeris == nullptr )
+//             {
+//                 throw std::runtime_error( "Warning when creating Maxwell gravity deformation of " + nameOfDeformingBody 
+//                     + "no rotation model found for " + nameOfDeformingBody );  
+//             }
+
+//             // Create gravity deformation object.
+//             deformationModel = std::make_shared< MaxwellGravityDeformationModel >(
+//                     std::bind( &Body::getPositionByReference, deformingBody, std::placeholders::_1 ),
+//                     maxwellDeformationSettings->maxwellRelaxationTime_,
+//                     maxwellDeformationSettings->globalRelaxationTime_,
+//                     sphericalHarmonicsGravityField->getGravitationalParameter( ),
+//                     perturbingBody->getGravitationalParameter( ),
+//                     sphericalHarmonicsGravityField->getReferenceRadius( ),
+//                     maxwellDeformationSettings->rotationRate_,
+//                     maxwellDeformationSettings->loveNumber_,
+//                     std::bind( &SphericalHarmonicsGravityField::getCosineCoefficientsBlock,
+//                                 sphericalHarmonicsGravityField,
+//                                 maxwellDeformationSettings->maximumDegree_,
+//                                 maxwellDeformationSettings->maximumOrder_ ),
+//                     std::bind( &SphericalHarmonicsGravityField::getSineCoefficientsBlock,
+//                                 sphericalHarmonicsGravityField,
+//                                 maxwellDeformationSettings->maximumDegree_,
+//                                 maxwellDeformationSettings->maximumOrder_ ),
+//                     std::bind( &Body::getPositionByReference, perturbingBody, std::placeholders::_1 ),
+//                     std::bind( &Body::getCurrentRotationToGlobalFrame, deformingBody ) );
+//         }
+//     }
+//     return deformationModel;
+// };
 
 
 // //! Function to create acceleration model object.

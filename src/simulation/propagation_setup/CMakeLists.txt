@@ -24,6 +24,7 @@ set(propagation_HEADERS
         propagationPrintSettings.h
         propagationProcessingSettings.h
         accelerationSettings.h
+        gravityDeformationSettings.h
         propagationOutputSettings.h
         setNumericallyIntegratedStates.h
         environmentUpdater.h

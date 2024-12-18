@@ -99,6 +99,7 @@ public:
             const std::vector< IntegratedStateType >& setIntegratedStatesFromEnvironment =
             std::vector< IntegratedStateType >( ) )
     {
+        // std::cout << "update environment" << std::endl;
         // Check consistency of input.
         if( ( integratedStatesToSet.size( ) + setIntegratedStatesFromEnvironment.size( ) ) != integratedStates_.size( ) )
         {
@@ -121,8 +122,10 @@ public:
 
         // Evaluate time-dependent update functions (dependent variables of state and time)
         // determined by setUpdateFunctions
+        // std::cout << "updateFunctionVector_.size( ) " << updateFunctionVector_.size( ) << std::endl;
         for( unsigned int i = 0; i < updateFunctionVector_.size( ); i++ )
         {
+            // std::cout << updateFunctionVector_.at( i ).template get< 1 >( ) << std::endl;
             updateFunctionVector_.at( i ).template get< 2 >( )( currentTime );
         }
     }
@@ -185,6 +188,20 @@ private:
             }
             case custom_state:
             {
+                break;
+            }
+            case gravity_deformation_state:
+            {
+                // Set gravity field for bodies provided as input.
+                std::vector< std::tuple< std::string, std::string, PropagatorType > > bodiesWithIntegratedGravity =
+                        integratedStates_.at( gravity_deformation_state );
+
+                for( unsigned int i = 0; i < bodiesWithIntegratedGravity.size( ); i++ )
+                {
+                    bodyList_.at( std::get< 0 >( bodiesWithIntegratedGravity[ i ] ) )
+                            ->setCurrentPropagatedGravityField( 
+                                integratedStateIterator_->second.segment( i * 3, 3 ).template cast< double >( ) );
+                }
                 break;
             }
             default:
@@ -674,7 +691,7 @@ private:
                     }
                     case spherical_harmonic_gravity_field_update:
                     {
-
+                        std::cout << "spherical_harmonic_gravity_field_update detected" << std::endl;
                         // Check if body has time-dependent sh field
                         std::shared_ptr< gravitation::TimeDependentSphericalHarmonicsGravityField >
                                 gravityField = std::dynamic_pointer_cast
