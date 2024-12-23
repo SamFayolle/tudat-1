@@ -28,6 +28,7 @@
 #include "tudat/astro/propagators/nBodyStateDerivative.h"
 #include "tudat/astro/propagators/rotationalMotionStateDerivative.h"
 #include "tudat/astro/propagators/variationalEquations.h"
+#include "tudat/simulation/propagation_setup/environmentUpdater.h"
 
 namespace tudat
 {
@@ -64,11 +65,12 @@ public:
             const std::vector< std::shared_ptr< SingleStateTypeDerivative< StateScalarType, TimeType > > >
             stateDerivativeModels,
             const std::function< void(
-                const TimeType, const std::unordered_map< IntegratedStateType, Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 > >&,
+            const TimeType, const std::unordered_map< IntegratedStateType, Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 > >&,
                 const std::vector< IntegratedStateType > ) > environmentUpdateFunction,
             const std::shared_ptr< VariationalEquations > variationalEquations =
-            std::shared_ptr< VariationalEquations >( ) ):
-        environmentUpdateFunction_( environmentUpdateFunction ), variationalEquations_( variationalEquations ),
+            std::shared_ptr< VariationalEquations >( ) ):   
+        environmentUpdateFunction_( environmentUpdateFunction ), 
+        variationalEquations_( variationalEquations ),
         functionEvaluationCounter_( 0 )
     {
         std::vector< IntegratedStateType > stateTypeList;
@@ -128,7 +130,7 @@ public:
             currentStatesPerTypeInConventionalRepresentation_[ stateDerivativeModels.at( i )->getIntegratedStateType( )  ] =
                     Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 >::Zero(
                         conventionalStateTypeSize_.at( stateDerivativeModels.at( i )->getIntegratedStateType( )  ), 1 );
-        }
+        } 
     }
 
 
@@ -145,7 +147,6 @@ public:
      */
     StateType computeStateDerivative( const TimeType time, const StateType& state )
     {
-        // std::cout << "in compute state derivative" << std::endl;
 
         if( !( time == time ) )
         {
@@ -646,7 +647,7 @@ private:
         // Iterate over all state derivative models
         for( stateDerivativeModelsIterator_ = stateDerivativeModels_.begin( );
              stateDerivativeModelsIterator_ != stateDerivativeModels_.end( );
-             stateDerivativeModelsIterator_++ )
+             stateDerivativeModelsIterator_++ )   
         {
             int currentStateTypeSize = 0;
 

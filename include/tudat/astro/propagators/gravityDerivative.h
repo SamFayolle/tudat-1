@@ -175,21 +175,12 @@ public:
     }
 
     //! Function included for compatibility purposes with base class, local and global representation is equal for gravity
-    //! deformation model. Function returns (by reference)  input internalSolution.
+    //! deformation model. Function returns (by reference) input internalSolution.
     void convertCurrentStateToGlobalRepresentation(
             const Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 >& internalSolution, const TimeType& time,
             Eigen::Block< Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 > > currentCartesianLocalSoluton )
     {
-        unsigned int counter = 0;
-        for ( auto it : gravityDeformationModels_ )
-        {
-            Eigen::Vector3d transientCoefficients = internalSolution.block( counter * 3, 0, 3, 1 );
-            std::shared_ptr< basic_astrodynamics::MaxwellGravityDeformationModel > maxwellModel = std::dynamic_pointer_cast< basic_astrodynamics::MaxwellGravityDeformationModel >( it.second.at( 0 ) );
-            double timeDouble = double( time );
-            currentCartesianLocalSoluton.block( 3*counter, 0, 3, 1 ) = maxwellModel->computeCurrentNominalCoefficients( transientCoefficients );    
-            counter += 1;
-        }
-        // this->convertToOutputSolution( internalSolution, time, currentCartesianLocalSoluton );
+        currentCartesianLocalSoluton = internalSolution;
     }
 
     //! Function included for compatibility purposes with base class, input and output representation is equal for gravity 
@@ -197,21 +188,7 @@ public:
     Eigen::Matrix< StateScalarType, Eigen::Dynamic, Eigen::Dynamic > convertFromOutputSolution(
             const Eigen::Matrix< StateScalarType, Eigen::Dynamic, Eigen::Dynamic >& outputSolution, const TimeType& time )
     {
-        Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 > nominalCoefficients = outputSolution;
-    
-        Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 > transientCoefficients = Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 >::Zero( nominalCoefficients.size( ), 1 );
-
-        unsigned int counter = 0;
-        for ( auto it : gravityDeformationModels_ )
-        {
-            std::shared_ptr< basic_astrodynamics::MaxwellGravityDeformationModel > maxwellModel = std::dynamic_pointer_cast< basic_astrodynamics::MaxwellGravityDeformationModel >( it.second.at( 0 ) );
-            double timeDouble = double( time );
-            transientCoefficients.block( 3*counter, 0, 3, 1 ) = maxwellModel->computeTransientCoefficients( nominalCoefficients, timeDouble );    
-            counter += 1;
-        }
-
-        // std::cout << "in convertFromOutputSolution : transientCoefficients " << transientCoefficients.transpose( ) << std::endl;
-        return transientCoefficients;
+        return outputSolution; 
     }
 
     //! Function included for compatibility purposes with base class, input and output representation is equal for gravity 
@@ -221,19 +198,7 @@ public:
             const TimeType& time,
             Eigen::Block< Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 > > currentCartesianLocalSolution )
     {
-
-        unsigned int counter = 0;
-        for ( auto it : gravityDeformationModels_ )
-        {
-            Eigen::Vector3d transientCoefficients = internalSolution.block( counter * 3, 0, 3, 1 );
-            std::shared_ptr< basic_astrodynamics::MaxwellGravityDeformationModel > maxwellModel = std::dynamic_pointer_cast< basic_astrodynamics::MaxwellGravityDeformationModel >( it.second.at( 0 ) );
-            double timeDouble = double( time );
-            currentCartesianLocalSolution.block( 3*counter, 0, 3, 1 ) = maxwellModel->computeNominalCoefficients( transientCoefficients, timeDouble );    
-            counter += 1;
-        }
-
-        // std::cout << "in convertToOutputSolution : nominalCoefficients " << currentCartesianLocalSolution.transpose( ) << std::endl;
-        // currentCartesianLocalSolution = nominalCoefficients;
+        currentCartesianLocalSolution = internalSolution;
     }
 
     //! Function to get the total size of the state of propagated gravity coefficients.

@@ -264,15 +264,6 @@ std::vector< std::string > > createEnvironmentUpdaterSettings(
         checkValidityOfRequiredEnvironmentUpdates( environmentModelsToUpdate, bodies );
     }
 
-    for ( auto it : environmentModelsToUpdate )
-        { 
-                for ( unsigned int i = 0 ; i < it.second.size( ) ; i++  )
-                {
-                        std::cout << it.first << " - " << it.second.at( i ) << std::endl;
-                }
-        }                
-        std::cout << "environmentModelsToUpdate: " << environmentModelsToUpdate.size( ) << std::endl;
-
     return environmentModelsToUpdate;
 
 }

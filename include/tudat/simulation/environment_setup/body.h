@@ -45,6 +45,7 @@
 #include "tudat/astro/system_models/vehicleSystems.h"
 #include "tudat/basics/basicTypedefs.h"
 #include "tudat/math/basic/numericalDerivative.h"
+#include "tudat/math/basic/rotationRepresentations.h"
 
 namespace tudat {
 
@@ -593,6 +594,8 @@ public:
         }
     }
 
+    void getStateByReference( Eigen::Vector6d& state ) { state = currentState_; }
+
     //! Set current state of body manually
     /*!
      * Set current state of body manually, which must be in the global frame. Note that this
@@ -639,7 +642,6 @@ public:
     template<typename StateScalarType = double, typename TimeType = double>
     void setStateFromEphemeris(const TimeType &time)
     {
-        std::cout << "set state from ephemeris " << time << std::endl;
         if (!(static_cast<Time>(time) == timeOfCurrentState_))
         {
             if( bodyEphemeris_ == nullptr )
@@ -937,10 +939,11 @@ public:
 
     currentAngularVelocityVectorInLocalFrame_ = currentRotationalStateFromLocalToGlobalFrame.block< 3, 1 >(4, 0);
 
-    Eigen::Matrix3d currentRotationMatrixToLocalFrame = (currentRotationToLocalFrame_).toRotationMatrix();
-    currentRotationToLocalFrameDerivative_ = linear_algebra::getCrossProductMatrix(
-                                                 currentRotationalStateFromLocalToGlobalFrame.block< 3, 1 >(4, 0 ))
-        * currentRotationMatrixToLocalFrame;
+    Eigen::Matrix3d currentRotationMatrixToLocalFrame = ( currentRotationToLocalFrame_ ).toRotationMatrix();
+    currentRotationToLocalFrameDerivative_ = - currentRotationMatrixToLocalFrame * 
+        linear_algebra::getCrossProductMatrix( currentAngularVelocityVectorInGlobalFrame_ );
+    //  linear_algebra::getCrossProductMatrix( currentAngularVelocityVectorInLocalFrame_ ) * currentRotationMatrixToLocalFrame;
+
     isRotationSet_ = true;
 
   }
@@ -1332,6 +1335,7 @@ public:
         double C20 = gravityCoefficients[ 0 ];
         double C22 = gravityCoefficients[ 1 ];
         double S22 = gravityCoefficients[ 2 ];
+        // std::cout << " setCurrentPropagatedGravityField " << C20 << " " << C22 << " " << S22 << std::endl;
         // if( gravityFieldModel_ == nullptr )
         // {
         //     gravityFieldModel_ = std::make_shared< SphericalHarmonicsGravityField >( const double gravitationalParameter,

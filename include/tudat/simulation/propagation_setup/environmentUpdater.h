@@ -70,7 +70,8 @@ public:
             std::vector< std::tuple< std::string, std::string, PropagatorType > > >& integratedStates =
             ( std::map< IntegratedStateType,
             std::vector< std::tuple< std::string, std::string, PropagatorType > > >( ) ) ):
-        bodyList_( bodyList ), integratedStates_( integratedStates )
+            // const std::vector< IntegratedStateType > statesToUpdateDuringPropagation = std::vector< IntegratedStateType >( ) ):
+        bodyList_( bodyList ), integratedStates_( integratedStates ) //, statesToUpdateDuringPropagation_( statesToUpdateDuringPropagation )
     {
         // Set update function to be evaluated as dependent variables of state and time during each
         // integration time step.
@@ -99,7 +100,6 @@ public:
             const std::vector< IntegratedStateType >& setIntegratedStatesFromEnvironment =
             std::vector< IntegratedStateType >( ) )
     {
-        // std::cout << "update environment" << std::endl;
         // Check consistency of input.
         if( ( integratedStatesToSet.size( ) + setIntegratedStatesFromEnvironment.size( ) ) != integratedStates_.size( ) )
         {
@@ -122,10 +122,8 @@ public:
 
         // Evaluate time-dependent update functions (dependent variables of state and time)
         // determined by setUpdateFunctions
-        // std::cout << "updateFunctionVector_.size( ) " << updateFunctionVector_.size( ) << std::endl;
         for( unsigned int i = 0; i < updateFunctionVector_.size( ); i++ )
         {
-            // std::cout << updateFunctionVector_.at( i ).template get< 1 >( ) << std::endl;
             updateFunctionVector_.at( i ).template get< 2 >( )( currentTime );
         }
     }

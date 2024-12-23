@@ -71,17 +71,14 @@ createMaxwellGravityFieldDeformationModel(
 
             // Create gravity deformation object.
             deformationModel = std::make_shared< MaxwellGravityDeformationModel >(
-                    std::bind( &Body::getPositionByReference, deformingBody, std::placeholders::_1 ),
-                    std::bind( &Body::getPositionInBaseFrameFromEphemeris< double, double >, deformingBody, std::placeholders::_1 ),
-                    std::bind( &Body::getPositionInBaseFrameFromEphemeris< double, double >, perturbingBody, std::placeholders::_1 ),
-                    std::bind( &Body::getRotationToBaseFrameFromEphemeris< double >, deformingBody, std::placeholders::_1 ),
+                    std::bind( &Body::getStateByReference, deformingBody, std::placeholders::_1 ),
                     nameOfPerturbingBody,
                     maxwellDeformationSettings->maxwellRelaxationTime_,
                     maxwellDeformationSettings->globalRelaxationTime_,
                     sphericalHarmonicsGravityField->getGravitationalParameter( ),
                     perturbingBody->getGravitationalParameter( ),
                     sphericalHarmonicsGravityField->getReferenceRadius( ),
-                    maxwellDeformationSettings->rotationRate_,
+                    std::bind( &Body::getCurrentAngularVelocityVectorInLocalFrame, deformingBody ),
                     maxwellDeformationSettings->loveNumber_,
                     std::bind( &SphericalHarmonicsGravityField::getCosineCoefficientsBlock,
                                 sphericalHarmonicsGravityField,
@@ -91,8 +88,9 @@ createMaxwellGravityFieldDeformationModel(
                                 sphericalHarmonicsGravityField,
                                 maxwellDeformationSettings->maximumDegree_,
                                 maxwellDeformationSettings->maximumOrder_ ),
-                    std::bind( &Body::getPositionByReference, perturbingBody, std::placeholders::_1 ),
-                    std::bind( &Body::getCurrentRotationToGlobalFrame, deformingBody ) );
+                    std::bind( &Body::getStateByReference, perturbingBody, std::placeholders::_1 ),
+                    std::bind( &Body::getCurrentRotationToGlobalFrame, deformingBody ),
+                    std::bind( &Body::getCurrentRotationMatrixDerivativeToLocalFrame, deformingBody ) );
         }
     }
     return deformationModel;

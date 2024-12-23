@@ -178,7 +178,7 @@ private:
 public:
 
     //! Typedef for a position-returning function.
-    typedef std::function< void( Eigen::Vector3d& ) > StateFunction;
+    typedef std::function< void( Eigen::Vector6d& ) > StateFunction;
 
     //! Constructor taking position-functions for bodies, and constant parameters of spherical
     //! harmonics expansion.
@@ -210,49 +210,44 @@ public:
      *          gradient calculation.
      */
     MaxwellGravityDeformationModel(
-            const StateFunction positionOfDeformingBodyFunction,
-            const std::function< Eigen::Vector3d( const double ) > deformingBodyPositionTimeFunction,
-            const std::function< Eigen::Vector3d( const double ) > perturbingBodyPositionTimeFunction,
-            const std::function< Eigen::Quaterniond( const double ) > rotationToBaseTimeFunction,
+            const StateFunction stateOfDeformingBodyFunction,
             const std::string perturbingBody,
             const double maxwellRelaxationTime,
             const double globalRelaxationTime,
             const double gravitationalParameterDeformingBody,
             const double gravitationalParameterPerturbingBody,
             const double referenceRadius,
-            const double rotationRate,
+            const std::function< Eigen::Vector3d( ) > angularVelocityDeformingBody,
             const double k2,
             CoefficientMatrixReturningFunction cosineCoefficients,
             CoefficientMatrixReturningFunction sineCoefficients,
-            // Eigen::VectorXd& transientCosineCoefficients,
-            // Eigen::VectorXd& transientSineCoefficients,
-            const StateFunction positionOfPerturbingBodyFunction =
-            [ ]( Eigen::Vector3d& input ){ input = Eigen::Vector3d::Zero( ); },
+            const StateFunction stateOfPerturbingBodyFunction =
+            [ ]( Eigen::Vector6d& input ){ input = Eigen::Vector6d::Zero( ); },
             const std::function< Eigen::Quaterniond( ) >
             rotationFromBodyFixedToIntegrationFrameFunction =
-            [ ]( ){ return Eigen::Quaterniond( Eigen::Matrix3d::Identity( ) ); } ) //,
+            [ ]( ){ return Eigen::Quaterniond( Eigen::Matrix3d::Identity( ) ); },
+            const std::function< Eigen::Matrix3d( ) >
+                rotationToLocalFrameDerivativeFunction = [ ]( ){ return Eigen::Matrix3d::Zero( ); } ) //,
             /*std::shared_ptr< basic_mathematics::SphericalHarmonicsCache > sphericalHarmonicsCache =
             std::make_shared< basic_mathematics::SphericalHarmonicsCache >( ) )*/ : 
             GravityDeformationModel( ),
-            positionOfDeformingBodyFunction_( positionOfDeformingBodyFunction ),
-            deformingBodyPositionTimeFunction_( deformingBodyPositionTimeFunction ),
-            perturbingBodyPositionTimeFunction_( perturbingBodyPositionTimeFunction ),
-            rotationToBaseTimeFunction_( rotationToBaseTimeFunction ),
+            stateOfDeformingBodyFunction_( stateOfDeformingBodyFunction ),
             perturbingBody_( perturbingBody ),
             maxwellRelaxationTime_( maxwellRelaxationTime ),
             globalRelaxationTime_( globalRelaxationTime ),
             gravitationalParameterDeformingBody_( gravitationalParameterDeformingBody ),
             gravitationalParameterPerturbingBody_( gravitationalParameterPerturbingBody ),
             referenceRadius_( referenceRadius ),
-            rotationRate_( rotationRate ),
+            angularVelocityDeformingBody_( angularVelocityDeformingBody ),
             k2_( k2 ),
             getCosineHarmonicsCoefficients( cosineCoefficients ),
             getSineHarmonicsCoefficients( sineCoefficients ),
           /*getCosineHarmonicsCoefficients( [ = ]( ){ return aCosineHarmonicCoefficientMatrix; } ),
           getSineHarmonicsCoefficients( [ = ]( ){ return aSineHarmonicCoefficientMatrix; } ),*/
-          positionOfPerturbingBodyFunction_( positionOfPerturbingBodyFunction ),
+          stateOfPerturbingBodyFunction_( stateOfPerturbingBodyFunction ),
           rotationFromBodyFixedToIntegrationFrameFunction_(
               rotationFromBodyFixedToIntegrationFrameFunction ),
+          rotationToBodyFixedDerivativeFunction_( rotationToLocalFrameDerivativeFunction ),
           /*sphericalHarmonicsCache_( sphericalHarmonicsCache ),*/
           saveSphericalHarmonicTermsSeparately_( false )
     {
@@ -265,22 +260,21 @@ public:
         std::cout << "original nominal coefficients: " << nominalCoefficients_.transpose( ) << std::endl;
 
         equilibriumCoefficients_ = Eigen::VectorXd::Zero( 3 ); 
-        transientCoefficients_ = Eigen::VectorXd::Zero( 3 ); 
+        derivativeEquilibriumCoefficients_ = Eigen::VectorXd::Zero( 3 );
 
-        // Update rotation and positions
+        // Update rotation and states
         rotationToIntegrationFrame_ = rotationFromBodyFixedToIntegrationFrameFunction_( );
-        positionOfDeformingBodyFunction_( positionOfDeformingBody_ );
-        positionOfPerturbingBodyFunction_( positionOfPerturbingBody_ );
+        stateOfDeformingBodyFunction_( stateOfDeformingBody_ );
+        stateOfPerturbingBodyFunction_( stateOfPerturbingBody_ );
         // std::cout << "positionOfDeformingBody_ " << positionOfDeformingBody_.transpose( ) << std::endl;
         // std::cout << "positionOfPerturbingBody_ " << positionOfPerturbingBody_.transpose( ) << std::endl;
-        // this->updateBaseMembers( );
 
-        // Compute relative position
-        currentInertialRelativePosition_ = positionOfDeformingBody_ - positionOfPerturbingBody_;
-        currentRelativePosition_ = rotationToIntegrationFrame_.inverse( ) * ( currentInertialRelativePosition_ );
-        // std::cout << "relative position: " << currentRelativePosition_.transpose( ) << std::endl;
+        // Compute relative state
+        currentInertialRelativeState_ = stateOfPerturbingBody_ - stateOfDeformingBody_;
+        currentRelativePosition_ = rotationToIntegrationFrame_.inverse( ) * ( currentInertialRelativeState_.segment( 0, 3 ) );
 
-        Eigen::Vector3d currentSphericalPositionPerturbingBody = coordinate_conversions::convertCartesianToSpherical( currentRelativePosition_ );
+        Eigen::Vector3d currentSphericalPositionPerturbingBody = coordinate_conversions::convertCartesianToSpherical( 
+            currentRelativePosition_ );
         currentLongitude_ = currentSphericalPositionPerturbingBody[ 2 ];
         double latitude = mathematical_constants::PI / 2.0 - currentSphericalPositionPerturbingBody.y( );
 
@@ -288,17 +282,6 @@ public:
         updateEquilibriumDeformation( );
         std::cout << "original equilibriumCoefficients: " << equilibriumCoefficients_.transpose( ) << std::endl;
 
-        // Initialise transient coefficients
-        updateTransientCoefficients( );
-        std::cout << "original transient coefficients: " << transientCoefficients_.transpose( ) << std::endl;
-
-        // maximumDegree_ = static_cast< int >( getCosineHarmonicsCoefficients( ).rows( ) ) - 1 ;
-        // maximumOrder_ = static_cast< int >( getCosineHarmonicsCoefficients( ).cols( ) )- 1 ;
-        // sphericalHarmonicsCache_->resetMaximumDegreeAndOrder(
-        //             std::max< int >( maximumDegree_,
-        //                              sphericalHarmonicsCache_->getMaximumDegree( ) ) + 1,
-        //             std::max< int >( maximumOrder_,
-        //                              sphericalHarmonicsCache_->getMaximumOrder( ) ) + 1 );
     }
 
     
@@ -324,8 +307,11 @@ public:
     {
         std::cout.precision( 20 );
 
+        // std::cout << "in updateMembers -- " << std::endl;
+
         if( !( this->currentTime_ == currentTime ) )
         {
+            // std::cout << "in updateMembers -- " << std::endl;
             // std::cout << "currentTime " << currentTime << std::endl;
 
             // Update gravity coefficients
@@ -334,71 +320,74 @@ public:
 
             nominalCoefficients_[ 0 ] = cosineHarmonicCoefficients( 2, 0 );
             nominalCoefficients_[ 1 ] = cosineHarmonicCoefficients( 2, 2 );
-            nominalCoefficients_[ 2 ] = sineHarmonicCoefficients( 2, 2 );
-            
+            nominalCoefficients_[ 2 ] = sineHarmonicCoefficients( 2, 2 );            
             // std::cout << "after resetting nominalCoefficients_ " << nominalCoefficients_.transpose( ) << std::endl;
 
-            updateTransientCoefficients( );
-
-            // Update transient coefficients
 
             // Update rotation and positions
             rotationToIntegrationFrame_ = rotationFromBodyFixedToIntegrationFrameFunction_( );
-            positionOfDeformingBodyFunction_( positionOfDeformingBody_ );
-            positionOfPerturbingBodyFunction_( positionOfPerturbingBody_ );
+            stateOfDeformingBodyFunction_( stateOfDeformingBody_ );
+            stateOfPerturbingBodyFunction_( stateOfPerturbingBody_ );
             // this->updateBaseMembers( );
 
-            // Compute relative position
-            currentInertialRelativePosition_ = positionOfPerturbingBody_ - positionOfDeformingBody_;
-            currentRelativePosition_ = rotationToIntegrationFrame_.inverse( ) * ( currentInertialRelativePosition_ );
+            // Compute relative inertial state
+            currentInertialRelativeState_ = stateOfPerturbingBody_ - stateOfDeformingBody_;
+            // std::cout << "currentInertialRelativeState_ " << currentInertialRelativeState_.transpose( ) << std::endl;
 
-            Eigen::Vector3d currentSphericalPositionPerturbingBody = coordinate_conversions::convertCartesianToSpherical( currentRelativePosition_ );
+            Eigen::Matrix3d currentRotationToLocalFrameDerivative = rotationToBodyFixedDerivativeFunction_( );
+            // std::cout << "currentRotationToLocalFrameDerivative " << std::endl;
+            // std::cout << currentRotationToLocalFrameDerivative << std::endl;
+
+            // std::cout << "rotationToIntegrationFrame_ " << std::endl;
+            // std::cout << rotationToIntegrationFrame_.toRotationMatrix( ) << std::endl;
+
+            // std::cout << "test 1" << std::endl;
+            // std::cout << rotationToIntegrationFrame_.inverse( ) * currentInertialRelativeState_.segment( 3, 3 ) << std::endl;
+            // std::cout << "test 2" << std::endl;
+            // std::cout << currentRotationToLocalFrameDerivative * currentInertialRelativeState_.segment( 0, 3 ) << std::endl;
+
+
+            // Compute current relative state in body-fixed frame
+            currentRelativePosition_ = rotationToIntegrationFrame_.inverse( ) * currentInertialRelativeState_.segment( 0, 3 );
+            currentRelativeVelocity_ = rotationToIntegrationFrame_.inverse( ) * currentInertialRelativeState_.segment( 3, 3 )
+                + currentRotationToLocalFrameDerivative * currentInertialRelativeState_.segment( 0, 3 );
+
+            // Compute spherical coordinates of perturbing body in body-fixed frame
+            Eigen::Vector3d currentSphericalPositionPerturbingBody = 
+                coordinate_conversions::convertCartesianToSpherical( currentRelativePosition_ );
             currentLongitude_ = currentSphericalPositionPerturbingBody[ 2 ];
             double latitude = mathematical_constants::PI / 2.0 - currentSphericalPositionPerturbingBody.y( );
-            // std::cout << "in updateMembers currentLongitude_ " << currentLongitude_ << std::endl;
+
+            // Compute current derivative of the perturbing body's body-fixed longitude
+            currentLongitudeDerivative_ = 
+                ( currentRelativeVelocity_[ 1 ] * currentRelativePosition_[ 0 ] 
+                - currentRelativeVelocity_[ 0 ] * currentRelativePosition_[ 1 ] ) 
+                / ( currentRelativePosition_[ 0 ] * currentRelativePosition_[ 0 ] + currentRelativePosition_[ 1 ] * currentRelativePosition_[ 1 ] );
+
+            std::cout << "in updateMembers time " << currentTime << " longitude " << currentLongitude_ << " distance " <<
+                 currentRelativePosition_.segment( 0, 3 ).norm( ) << " longitude derivative " << currentLongitudeDerivative_ << std::endl;
+
+            // std::cout << "rotation " << rotationToIntegrationFrame_.toRotationMatrix( ) << std::endl;;  
+            // std::cout << "position deforming " << positionOfDeformingBody_.transpose( ) << std::endl;
+            // std::cout << "position perturbing " << positionOfPerturbingBody_.transpose( ) << std::endl;
 
             updateEquilibriumDeformation( );
-            // updateTransientCoefficients( );
 
-            // THE CURRENT COEFFICIENTS SHOULD BE UPDATED AT THIS POINT
-             std::cout << "nominal coefficients: " << nominalCoefficients_.transpose( ) << std::endl;
-             std::cout << "equilibriumCoefficients: " << equilibriumCoefficients_.transpose( ) << std::endl;
-            //  std::cout << "transient coefficients: " << transientCoefficients_.transpose( ) << std::endl;
+            // // THE CURRENT COEFFICIENTS SHOULD BE UPDATED AT THIS POINT
+            //  std::cout << "nominal coefficients: " << nominalCoefficients_.transpose( ) << std::endl;
+            //  std::cout << "equilibriumCoefficients: " << equilibriumCoefficients_.transpose( ) << std::endl;
+            //  std::cout << "derivativeEquilibriumCoefficients_ " << derivativeEquilibriumCoefficients_.transpose( ) << std::endl; 
 
-            // Current (transient) deformation
-            currentDeformation_ = ( 1.0 / globalRelaxationTime_ ) * ( equilibriumCoefficients_ - transientCoefficients_ );
-            std::cout << "currentDeformation_: " << currentDeformation_.transpose( ) << std::endl;
-
-
-            
-
-            //         computeGeodesyNormalizedGravitationalAccelerationSum(
-            //             currentRelativePosition_,
-            //             gravitationalParameter,
-            //             equatorialRadius,
-            //             cosineHarmonicCoefficients,
-            //             sineHarmonicCoefficients, sphericalHarmonicsCache_,
-            //             accelerationPerTerm_,
-            //             saveSphericalHarmonicTermsSeparately_,
-            //             rotationToIntegrationFrame_.toRotationMatrix( ) );
-            // currentAccelerationInBodyFixedFrame_ = rotationToIntegrationFrame_.inverse( ) * currentAcceleration_;
-
-            // if ( this->updatePotential_ )
-            // {
-            //     this->currentPotential_ = gravitation::calculateSphericalHarmonicGravitationalPotential(
-            //             currentRelativePosition_,
-            //             gravitationalParameter,
-            //             equatorialRadius,
-            //             cosineHarmonicCoefficients,
-            //             sineHarmonicCoefficients,
-            //             sphericalHarmonicsCache_ );
-            // }
+            currentDeformation_ = ( 1.0 / globalRelaxationTime_ ) * ( 
+                equilibriumCoefficients_ - nominalCoefficients_ + maxwellRelaxationTime_ * derivativeEquilibriumCoefficients_ );
+            // std::cout << "currentDeformation_: " << currentDeformation_.transpose( ) << std::endl;
+       
         }
     }
 
     void updateEquilibriumDeformation( const double currentTime = TUDAT_NAN )
     {
-        double relativeDistance = currentRelativePosition_.norm( );
+        double relativeDistance = currentRelativePosition_.segment( 0, 3 ).norm( );
         // std::cout << "relativeDistance " << relativeDistance << std::endl;
         double radiusRatioPowerThree = referenceRadius_ * referenceRadius_ * referenceRadius_ / ( 
             relativeDistance * relativeDistance * relativeDistance );
@@ -406,142 +395,52 @@ public:
         // std::cout << "currentLongitude_ " << currentLongitude_ << std::endl;
 
         double gravitationalParametersRatio = gravitationalParameterPerturbingBody_ / gravitationalParameterDeformingBody_ ;
-        // std::cout << "gravitationalParametersRatio " << gravitationalParametersRatio << std::endl;
+        // // std::cout << "gravitationalParametersRatio " << gravitationalParametersRatio << std::endl;
 
-        std::cout << "in update equilibrium " << currentTime << std::endl;
-        std::cout << "rotation " << rotationToIntegrationFrame_.toRotationMatrix( ) << std::endl;;  
-        std::cout << "position deforming " << positionOfDeformingBody_.transpose( ) << std::endl;
-        std::cout << "position perturbing " << positionOfPerturbingBody_.transpose( ) << std::endl;
+        // std::cout << "in update equilibrium " << currentTime << std::endl;
+        // std::cout << "rotation " << rotationToIntegrationFrame_.toRotationMatrix( ) << std::endl;;  
+        // std::cout << "position deforming " << positionOfDeformingBody_.transpose( ) << std::endl;
+        // std::cout << "position perturbing " << positionOfPerturbingBody_.transpose( ) << std::endl;
+
+        double rotationRate = angularVelocityDeformingBody_( ).norm( );
+        double rotationRateDerivative = 0.0; // SHOULD BE MODIFIED
 
         equilibriumCoefficients_[ 0 ] = - k2_ * ( 
-            rotationRate_ * rotationRate_ * referenceRadius_* referenceRadius_ * referenceRadius_ 
+            rotationRate * rotationRate * referenceRadius_* referenceRadius_ * referenceRadius_ 
             / ( 3.0 * gravitationalParameterDeformingBody_ ) + 0.5 * gravitationalParametersRatio * radiusRatioPowerThree );
         equilibriumCoefficients_[ 1 ] = k2_ / 4.0 * gravitationalParametersRatio * radiusRatioPowerThree * 
             std::cos( 2.0 * currentLongitude_ );
         equilibriumCoefficients_[ 2 ] = - k2_ / 4.0 * gravitationalParametersRatio * radiusRatioPowerThree * 
             std::sin( 2.0 * currentLongitude_ );
 
-        // std::cout << "equilibriumCoefficients_ " << equilibriumCoefficients_.transpose( ) << std::endl;
-    }
+        double currentDistanceDerivative = 
+            ( currentRelativePosition_[ 0 ] * currentRelativeVelocity_[ 0 ] 
+            + currentRelativePosition_[ 1 ] * currentRelativeVelocity_[ 1 ] 
+            + currentRelativePosition_[ 2 ] * currentRelativeVelocity_[ 2 ] ) / relativeDistance;
 
-    Eigen::Vector3d computeEquilibriumDeformation( const double currentTime = TUDAT_NAN )
-    {
-        Eigen::Vector3d currentEquilibriumCoefficients = Eigen::Vector3d::Zero( );
+        derivativeEquilibriumCoefficients_[ 0 ] = - k2_ * ( 
+            2.0 * rotationRate * referenceRadius_ * referenceRadius_ * referenceRadius_ / ( 3.0 * gravitationalParameterDeformingBody_ )
+            * rotationRateDerivative
+            - 3.0 / 2.0 * gravitationalParametersRatio * radiusRatioPowerThree * 
+            currentRelativePosition_.dot( currentRelativeVelocity_ ) / ( relativeDistance * relativeDistance ) );
 
-        // Update rotation and positions
-        Eigen::Vector3d currentPositionDeformingBody = deformingBodyPositionTimeFunction_( currentTime );
-        Eigen::Vector3d currentPositionPerturbingBody = perturbingBodyPositionTimeFunction_( currentTime );
-        std::cout << "currentPositionDeformingBody " << currentPositionDeformingBody.transpose( ) << std::endl;
-        std::cout << "currentPositionPerturbingBody " << currentPositionPerturbingBody.transpose( ) << std::endl;
+        derivativeEquilibriumCoefficients_[ 1 ] = - k2_ / 4.0 * gravitationalParametersRatio * radiusRatioPowerThree * (
+            3.0 * currentDistanceDerivative / relativeDistance * std::cos( 2.0 * currentLongitude_ )
+            + 2.0 * currentLongitudeDerivative_ * std::sin( 2.0 * currentLongitude_ ) );
 
-        std::cout << "in compute equilibrium deformation " << currentTime << std::endl;
-        Eigen::Quaterniond currentRotation = rotationToBaseTimeFunction_( currentTime );
-        std::cout << "currentRotation " << currentRotation.toRotationMatrix( ) << std::endl;
-
-        // Compute relative position
-        Eigen::Vector3d currentInertialRelativePosition = currentPositionPerturbingBody - currentPositionDeformingBody;
-        Eigen::Vector3d currentRelativePosition = currentRotation.inverse( ) * ( currentInertialRelativePosition );
-
-        Eigen::Vector3d currentSphericalPosition = coordinate_conversions::convertCartesianToSpherical( currentRelativePosition );
-        double currentLongitude = currentSphericalPosition[ 2 ];
-
-        double relativeDistance = currentRelativePosition.norm( );
-        // std::cout << "relativeDistance " << relativeDistance << std::endl;
-        double radiusRatioPowerThree = referenceRadius_ * referenceRadius_ * referenceRadius_ / ( 
-            relativeDistance * relativeDistance * relativeDistance );
-        // std::cout << "radiusRatioPowerThree " << radiusRatioPowerThree << std::endl;
-        std::cout << "in computeEquilibriumDeformation " << currentTime << " " << currentLongitude << std::endl;
-
-        double gravitationalParametersRatio = gravitationalParameterPerturbingBody_ / gravitationalParameterDeformingBody_ ;
-        // std::cout << "gravitationalParametersRatio " << gravitationalParametersRatio << std::endl;
-
-        currentEquilibriumCoefficients[ 0 ] = - k2_ * ( 
-            rotationRate_ * rotationRate_ * referenceRadius_* referenceRadius_ * referenceRadius_ 
-            / ( 3.0 * gravitationalParameterDeformingBody_ ) + 0.5 * gravitationalParametersRatio * radiusRatioPowerThree );
-        currentEquilibriumCoefficients[ 1 ] = k2_ / 4.0 * gravitationalParametersRatio * radiusRatioPowerThree * 
-            std::cos( 2.0 * currentLongitude );
-        currentEquilibriumCoefficients[ 2 ] = - k2_ / 4.0 * gravitationalParametersRatio * radiusRatioPowerThree * 
-            std::sin( 2.0 * currentLongitude );
-
-        return currentEquilibriumCoefficients;
+        derivativeEquilibriumCoefficients_[ 2 ] = k2_ / 4.0 * gravitationalParametersRatio * radiusRatioPowerThree * (
+            3.0 * currentDistanceDerivative / relativeDistance * std::sin( 2.0 * currentLongitude_ )
+            - 2.0 * currentLongitudeDerivative_ * std::cos( 2.0 * currentLongitude_ ) );
 
         // std::cout << "equilibriumCoefficients_ " << equilibriumCoefficients_.transpose( ) << std::endl;
     }
 
-    Eigen::Vector3d computeNominalCoefficients( Eigen::Vector3d transientCoefficients, const double currentTime = TUDAT_NAN )
-    {
-        // std::cout << "computeNominalCoefficients " << std::endl;
-        Eigen::Vector3d equilibriumCoefficients = computeEquilibriumDeformation( currentTime );
-
-        Eigen::Vector3d nominalCoefficients = Eigen::Vector3d::Zero( );
-        nominalCoefficients = ( 1.0 - maxwellRelaxationTime_ / globalRelaxationTime_ ) * transientCoefficients + maxwellRelaxationTime_ / globalRelaxationTime_ * equilibriumCoefficients;
-
-        std::cout << "in computeNominalCoefficients equilibriumCoefficients " << equilibriumCoefficients.transpose( ) << std::endl;
-        // std::cout << "in computeNominalCoefficients transientCoefficients " << transientCoefficients.transpose( ) << std::endl;
-        std::cout << "in computeNominalCoefficients nominalCoefficients " << nominalCoefficients.transpose( ) << std::endl;
-
-        return nominalCoefficients;
-    }
-
-    Eigen::Vector3d computeCurrentNominalCoefficients( Eigen::Vector3d transientCoefficients )
-    {
-        // std::cout << "computeNominalCoefficients " << std::endl;
-        updateEquilibriumDeformation( );
-        std::cout << "in computeCurrentNominalCoefficients " << currentLongitude_ << std::endl;
-
-        // std::cout << "rotation " << rotationToIntegrationFrame_.toRotationMatrix( ) << std::endl;;  
-        // std::cout << "position deforming " << positionOfDeformingBody_.transpose( ) << std::endl;
-        // std::cout << "position perturbing " << positionOfPerturbingBody_.transpose( ) << std::endl;
-
-        // Eigen::Vector3d equilibriumCoefficients = computeEquilibriumDeformation( currentTime );
-        // std::cout << "in computeNominalCoefficients equilibriumCoefficients " << equilibriumCoefficients.transpose( ) << std::endl;
-
-        Eigen::Vector3d nominalCoefficients = Eigen::Vector3d::Zero( );
-        nominalCoefficients = ( 1.0 - maxwellRelaxationTime_ / globalRelaxationTime_ ) * transientCoefficients + maxwellRelaxationTime_ / globalRelaxationTime_ * equilibriumCoefficients_;
-
-        std::cout << "in computeCurrentNominalCoefficients equilibriumCoefficients " << equilibriumCoefficients_.transpose( ) << std::endl;
-        // std::cout << "in computeCurrentNominalCoefficients transientCoefficients " << transientCoefficients.transpose( ) << std::endl;
-        std::cout << "in computeCurrentNominalCoefficients nominalCoefficients " << nominalCoefficients.transpose( ) << std::endl;
-
-        // std::cout << "in computeNominalCoefficients transientCoefficients " << transientCoefficients.transpose( ) << std::endl;
-        // std::cout << "in computeNominalCoefficients nominalCoefficients " << nominalCoefficients.transpose( ) << std::endl;
-
-        return nominalCoefficients;
-    }
-
-    Eigen::Vector3d computeTransientCoefficients( Eigen::Vector3d nominalCoefficients, const double currentTime = TUDAT_NAN )
-    {
-        Eigen::Vector3d equilibriumCoefficients = computeEquilibriumDeformation( currentTime );
-
-        Eigen::Vector3d transientCoefficients = Eigen::Vector3d::Zero( );
-        transientCoefficients = 1.0 / ( globalRelaxationTime_ - maxwellRelaxationTime_ ) * ( globalRelaxationTime_ * nominalCoefficients - maxwellRelaxationTime_ * equilibriumCoefficients ); 
-
-        return transientCoefficients;
-    }
-
-    void updateCurrentCoefficients( )
-    {
-        nominalCoefficients_ = ( 1.0 - maxwellRelaxationTime_ / globalRelaxationTime_ ) * transientCoefficients_
-        + ( maxwellRelaxationTime_ / globalRelaxationTime_ ) * equilibriumCoefficients_;
-    }
-
-    void updateTransientCoefficients()
-    {
-        transientCoefficients_ = ( 1.0 / ( globalRelaxationTime_ - maxwellRelaxationTime_ ) ) * ( globalRelaxationTime_ * nominalCoefficients_ - maxwellRelaxationTime_ * equilibriumCoefficients_ );
-    }
 
     Eigen::VectorXd getCurrentCoefficients( )
     {
         return nominalCoefficients_;
     }
 
-    Eigen::VectorXd getTransientCoefficients( )
-    {
-        return transientCoefficients_;
-    }
-
-    
-   
 
     //! Function to retrieve the spherical harmonics cache for this acceleration.
     /*!
@@ -573,9 +472,9 @@ public:
      * frame
      * \return Current position vector from body exerting acceleration to body undergoing acceleration, in inertial frame
      */
-    Eigen::Vector3d getCurrentInertialRelativePosition( )
+    Eigen::Vector6d getCurrentInertialRelativeState( )
     {
-        return currentInertialRelativePosition_;
+        return currentInertialRelativeState_;
     }
 
     //! Function to retrieve the spherical harmonics reference radius.
@@ -726,11 +625,6 @@ public:
         return k2_;
     }
 
-    double getRotationRate( ) const
-    {
-        return rotationRate_;
-    }
-
     double getMaxwellRelaxationTime( ) const
     {
         return maxwellRelaxationTime_;
@@ -756,15 +650,14 @@ public:
         return referenceRadius_;
     }
 
-    // TO BE MODIFIED
-    StateFunction getPositionOfDeformingBodyFunction( )
+    StateFunction getStateOfDeformingBodyFunction( )
     {
-        return positionOfDeformingBodyFunction_;
+        return stateOfDeformingBodyFunction_;
     }
 
-    StateFunction getPositionOfPerturbingBodyFunction( )
+    StateFunction getStateOfPerturbingBodyFunction( )
     {
-        return positionOfPerturbingBodyFunction_;
+        return stateOfPerturbingBodyFunction_;
     }
 
 
@@ -772,11 +665,11 @@ protected:
 
 private:
 
-    Eigen::Vector3d positionOfDeformingBody_;
+    Eigen::Vector6d stateOfDeformingBody_;
 
     const std::string perturbingBody_;
 
-    Eigen::Vector3d positionOfPerturbingBody_;
+    Eigen::Vector6d stateOfPerturbingBody_;
 
     const double maxwellRelaxationTime_;
 
@@ -788,14 +681,12 @@ private:
             
     const double referenceRadius_;
 
-    const double rotationRate_;
-
     //! Love number k2
     const double k2_;
 
     Eigen::VectorXd equilibriumCoefficients_;
 
-    Eigen::VectorXd transientCoefficients_;
+    Eigen::VectorXd derivativeEquilibriumCoefficients_;
 
     Eigen::VectorXd nominalCoefficients_;
 
@@ -828,6 +719,8 @@ private:
     //! Function returning the current rotation from body-fixed frame to integration frame.
     std::function< Eigen::Quaterniond( ) > rotationFromBodyFixedToIntegrationFrameFunction_;
 
+    std::function< Eigen::Matrix3d( ) > rotationToBodyFixedDerivativeFunction_;
+
     //! Current rotation from body-fixed frame to integration frame.
     Eigen::Quaterniond rotationToIntegrationFrame_;
 
@@ -835,8 +728,12 @@ private:
     //! undergoing acceleration
     Eigen::Vector3d currentRelativePosition_;
 
+    Eigen::Vector3d currentRelativeVelocity_;
+
     //! Current position vector from body exerting acceleration to body undergoing acceleration, in inertial frame
     Eigen::Vector3d currentInertialRelativePosition_;
+
+    Eigen::Vector6d currentInertialRelativeState_;
 
     //!  Spherical harmonics cache for this acceleration
     std::shared_ptr< basic_mathematics::SphericalHarmonicsCache > sphericalHarmonicsCache_;
@@ -856,17 +753,17 @@ private:
     int maximumOrder_;
 
     //! Function returning the state of the body undergoing deformation
-    StateFunction positionOfDeformingBodyFunction_;
+    StateFunction stateOfDeformingBodyFunction_;
 
     //! Function returning the state of the body causing the deformation
-    StateFunction positionOfPerturbingBodyFunction_;
+    StateFunction stateOfPerturbingBodyFunction_;
 
     //! Current body-fixed longitude of the perturbing body
     double currentLongitude_;
 
-    std::function< Eigen::Vector3d( const double ) > deformingBodyPositionTimeFunction_;
-    std::function< Eigen::Vector3d( const double ) > perturbingBodyPositionTimeFunction_;
-    std::function< Eigen::Quaterniond( const double ) > rotationToBaseTimeFunction_;
+    double currentLongitudeDerivative_;
+
+    std::function< Eigen::Vector3d( ) > angularVelocityDeformingBody_;
 
 };
 
