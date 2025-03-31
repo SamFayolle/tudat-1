@@ -27,6 +27,7 @@
 #include "tudat/astro/propagators/singleStateTypeDerivative.h"
 #include "tudat/astro/propagators/nBodyStateDerivative.h"
 #include "tudat/astro/propagators/rotationalMotionStateDerivative.h"
+#include "tudat/astro/propagators/gravityDerivative.h"
 #include "tudat/astro/propagators/variationalEquations.h"
 #include "tudat/simulation/propagation_setup/environmentUpdater.h"
 
@@ -68,10 +69,12 @@ public:
             const TimeType, const std::unordered_map< IntegratedStateType, Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 > >&,
                 const std::vector< IntegratedStateType > ) > environmentUpdateFunction,
             const std::shared_ptr< VariationalEquations > variationalEquations =
-            std::shared_ptr< VariationalEquations >( ) ):   
+            std::shared_ptr< VariationalEquations >( ),
+            const std::shared_ptr< StateDerivativeUpdater< StateScalarType, TimeType > > stateDerivativeUpdater = nullptr ):   
         environmentUpdateFunction_( environmentUpdateFunction ), 
         variationalEquations_( variationalEquations ),
-        functionEvaluationCounter_( 0 )
+        functionEvaluationCounter_( 0 ),
+        stateDerivativeUpdater_( stateDerivativeUpdater )
     {
         std::vector< IntegratedStateType > stateTypeList;
         totalConventionalStateSize_ = 0;
@@ -130,7 +133,54 @@ public:
             currentStatesPerTypeInConventionalRepresentation_[ stateDerivativeModels.at( i )->getIntegratedStateType( )  ] =
                     Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 >::Zero(
                         conventionalStateTypeSize_.at( stateDerivativeModels.at( i )->getIntegratedStateType( )  ), 1 );
-        } 
+        }
+
+        /// ADDED STUFF
+        
+        std::map< StateDerivativeDependency, std::vector< std::pair< std::string, 
+                std::function< void( const Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 >& ) > > > > environmentUpdateFunctions = 
+                stateDerivativeUpdater->getEnvironmentUpdateFunctions( );
+        std::map< IntegratedStateType, std::vector< std::pair< int, int > > > stateDerivativeIndices;
+
+        for ( auto dependencyTypeIt : environmentUpdateFunctions )
+        {
+            IntegratedStateType stateType = getStateTypeForDependency( dependencyTypeIt.first );
+            std::vector< std::shared_ptr< SingleStateTypeDerivative< StateScalarType, TimeType > > > currentStateDerivativeModels =
+                 stateDerivativeModels_.at( stateType );
+
+            for ( unsigned int k = 0 ; k < dependencyTypeIt.second.size( ) ; k++ )
+            {
+                std::string bodyToCheck = dependencyTypeIt.second.at( k ).first;
+                for ( unsigned int indexCurrentModel = 0 ; indexCurrentModel < currentStateDerivativeModels.size( ) ; 
+                    indexCurrentModel++ )
+                {
+                    std::vector< std::string > integratedBodies = 
+                        currentStateDerivativeModels.at( indexCurrentModel )->getBodiesToIntegrate( );
+                    
+                    if ( std::count( integratedBodies.begin( ), integratedBodies.end( ), bodyToCheck ) > 0 )
+                    {
+                        unsigned int indexBody = find( integratedBodies.begin( ), integratedBodies.end( ), bodyToCheck ) 
+                            - integratedBodies.begin( );
+
+                        std::pair< int, int > indexFullState = propagatedStateIndices_.at( stateType ).at( indexCurrentModel );
+                        std::cout << "indexFullState " << indexFullState.first << " - " << indexFullState.second << std::endl;
+
+                        int propagatedSingleStateSize = indexFullState.second / integratedBodies.size( );
+                        std::cout << "propagatedSingleStateSize " << propagatedSingleStateSize << std::endl;
+
+                        std::pair< int, int > indexSingleStateBody = std::make_pair( 
+                            indexFullState.first + propagatedSingleStateSize * indexBody, propagatedSingleStateSize );
+                        std::cout << "indexSingleStateBody " << indexSingleStateBody.first << " " << indexSingleStateBody.second << std::endl;
+                        stateDerivativeIndices[ stateType ].push_back( indexSingleStateBody );
+                    }
+
+                }
+            }
+        
+        }
+
+        stateDerivativeUpdater_->setStateDerivativeIndices( stateDerivativeIndices );
+
     }
 
 
@@ -147,7 +197,7 @@ public:
      */
     StateType computeStateDerivative( const TimeType time, const StateType& state )
     {
-
+        // std::cout << "in computeStateDerivative TIME " << time << std::endl;
         if( !( time == time ) )
         {
             throw std::invalid_argument( "Error when computing system state derivative. Input time is NaN" );
@@ -168,6 +218,7 @@ public:
         if( stateDerivative_.rows( ) != state.rows( ) || stateDerivative_.cols( ) != state.cols( )  )
         {
             stateDerivative_.resize( state.rows( ), state.cols( ) );
+            oldStateDerivative_.resize( state.rows( ), state.cols( ) );
         }
 
         // If dynamical equations are integrated, update the environment with the current state.
@@ -247,6 +298,74 @@ public:
         // Update counters
         functionEvaluationCounter_++;
         cumulativeFunctionEvaluationCounter_[ time ] = functionEvaluationCounter_;
+
+        /// ADDED STUFF
+
+        // std::cout << "stateDerivative_" << std::endl;
+        // std::cout << stateDerivative_.transpose( ) << std::endl;
+
+        bool interdependencies = true;
+        bool convergenceReached = false;
+        int iterations = 1;
+        int maxIterations = 4;
+        double convergenceTolerance = 1.0e-14;
+        while ( interdependencies && !convergenceReached )
+        {
+            // std::cout << "ITERATION " << iterations << std::endl;
+
+            // Iterate
+            oldStateDerivative_ = stateDerivative_;
+
+            // Update state derivative values in environment and state derivative models
+            stateDerivativeUpdater_->updateEnvironmentFromStateDerivative( time, stateDerivative_ );
+            stateDerivativeUpdater_->updateStateDerivativeModels( time );
+    
+
+            // Recompute state derivative (only when necessary)
+            for ( auto modelIt : stateDerivativeUpdater_->getStateDerivativeModelsToUpdate( ) )
+            {
+                for( unsigned int i = 0; i < modelIt.second.size( ); i++ )
+                {
+                    // Evaluate and set current dynamical state derivative
+                    currentIndices = propagatedStateIndices_.at( modelIt.first ).at( i );
+
+                    modelIt.second.at( i )->calculateSystemStateDerivative(
+                        time, state.block( currentIndices.first, dynamicsStartColumn_, currentIndices.second, 1 ),
+                        stateDerivative_.block( currentIndices.first, dynamicsStartColumn_, currentIndices.second, 1 ) );
+                }
+            }
+
+            
+            // std::cout << "oldStateDerivative_: " << oldStateDerivative_.transpose( ) << std::endl;
+            // std::cout << "NEW state derivative: " << stateDerivative_.transpose( ) << std::endl;
+            
+            iterations += 1;
+
+            // Check if convergence is reached or maximum number of iterations is attained
+            convergenceReached = true;
+            for ( unsigned int i = 0 ; i < oldStateDerivative_.rows( ) ; i++ )
+            {
+                for ( unsigned int j = 0 ; j < oldStateDerivative_.cols( ) ; j++ )
+                {
+                    if ( std::fabs( oldStateDerivative_( i, j ) - stateDerivative_( i, j ) ) > convergenceTolerance )
+                    {
+                        // std::cout << "std::fabs( oldStateDerivative_( i, j ) - stateDerivative_( i, j ) ) " << 
+                            // std::fabs( oldStateDerivative_( i, j ) - stateDerivative_( i, j ) ) << std::endl;
+                        convergenceReached = false;
+                    }
+                }
+            }
+            if ( iterations > maxIterations )
+            {
+                if ( !convergenceReached )
+                {
+                    std::cout << "max iteration reached " << std::endl;
+                }
+                convergenceReached = true;
+            }
+
+        }
+
 
         return stateDerivative_;
 
@@ -729,6 +848,8 @@ private:
     //! Current state derivative, as computed by computeStateDerivative.
     StateType stateDerivative_;
 
+    StateType oldStateDerivative_;
+
     //! Current state in 'conventional' representation, computed from current propagated state by
     //! convertCurrentStateToGlobalRepresentationPerType
     std::unordered_map< IntegratedStateType, Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 > >
@@ -739,6 +860,9 @@ private:
 
     //! Variable to keep track of the number of calls to the computeStateDerivative function per time step
     std::map< TimeType, unsigned int > cumulativeFunctionEvaluationCounter_;
+
+    std::shared_ptr< StateDerivativeUpdater< StateScalarType, TimeType > > stateDerivativeUpdater_;
+
 };
 
 //extern template class DynamicsStateDerivativeModel< double, double >;
@@ -1017,8 +1141,8 @@ std::shared_ptr< RotationalMotionStateDerivative< StateScalarType, TimeType > > 
     }
     else
     {
-        std::string errorMessage = "Error when getting translational dynamics model for " +
-                bodyUndergoingTorque + " no translational dynamics models found";
+        std::string errorMessage = "Error when getting rotational dynamics model for " +
+                bodyUndergoingTorque + " no rotational dynamics models found";
         throw std::runtime_error( errorMessage );
     }
     return modelForBody;

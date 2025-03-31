@@ -34,7 +34,9 @@ enum EnvironmentModelsToUpdate
     radiation_source_model_update = 6,
     cannonball_radiation_pressure_target_model_update = 7,
     panelled_radiation_pressure_target_model_update = 8,
-    body_segment_orientation_update = 9
+    body_segment_orientation_update = 9/*,
+    body_inertia_tensor_derivative_update = 10,
+    body_angular_velocity_derivative_update = 11*/
 };
 
 //! Function to extend existing list of required environment update types

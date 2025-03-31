@@ -115,9 +115,9 @@ AvailableAcceleration getAccelerationModelType(
 AvailableMassRateModels getMassRateModelType(
         const std::shared_ptr< MassRateModel > massRateModel );
 
-//! Function to identify the type of a gravity deformation model.
-simulation_setup::GravityDeformationType getGravityDeformationModelType(
-        const std::shared_ptr< basic_astrodynamics::GravityDeformationModel > gravityDeformationModel );
+// //! Function to identify the type of a gravity deformation model.
+// simulation_setup::GravityDeformationType getGravityDeformationModelType(
+//         const std::shared_ptr< basic_astrodynamics::GravityDeformationModel > gravityDeformationModel );
 
 // Function to get all acceleration models of a given type from a list of models
 /*

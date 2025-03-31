@@ -105,9 +105,12 @@ public:
      */
     InertialTorqueModel(
             const std::function< Eigen::Vector3d( ) > angularVelocityFunction,
-            const std::function< Eigen::Matrix3d( ) > inertiaTensorFunction ):TorqueModel( ),
+            const std::function< Eigen::Matrix3d( ) > inertiaTensorFunction,
+            const std::function< Eigen::Matrix3d( ) > inertiaTensorDerivativeFunction ):
+            TorqueModel( ),
     angularVelocityFunction_( angularVelocityFunction ),
-    inertiaTensorFunction_( inertiaTensorFunction ){ }
+    inertiaTensorFunction_( inertiaTensorFunction ),
+    inertiaTensorDerivativeFunction_( inertiaTensorDerivativeFunction ){ }
 
     //! Destructor
     ~InertialTorqueModel( ) { }
@@ -133,11 +136,22 @@ public:
      */
     virtual void updateMembers( const double currentTime )
     {
-        if( !( currentTime == currentTime_ ) )
-        {
-            currentTorque_ = -angularVelocityFunction_( ).cross( inertiaTensorFunction_( ) * angularVelocityFunction_( ) );
+        // if( !( currentTime == currentTime_ ) )
+        // {
+            // std::cout << "in update members inertial torque" << std::endl;
+            // std::cout << "inertiaTensor" << std::endl;
+            // std::cout << inertiaTensorFunction_( ) << std::endl;
+            // std::cout << "inertiaTensorTimeDerivative" << std::endl;
+            // std::cout << inertiaTensorDerivativeFunction_( ) << std::endl;
+            // std::cout << "angularVelocityFunction_( ) " << angularVelocityFunction_( ) << std::endl;
+            currentTorque_ = -angularVelocityFunction_( ).cross( inertiaTensorFunction_( ) * angularVelocityFunction_( ) )
+                - inertiaTensorDerivativeFunction_( ) * angularVelocityFunction_( );
+            // std::cout << "inertia contribution " << 
+                // ( -angularVelocityFunction_( ).cross( inertiaTensorFunction_( ) * angularVelocityFunction_( ) ) ).transpose( ) << std::endl;
+            // std::cout << "inertia derivative contribution " << 
+                // ( - inertiaTensorDerivativeFunction_( ) * angularVelocityFunction_( ) ).transpose( ) << std::endl;
             currentTime_ = currentTime;
-        }
+        // }
     }
 
 protected:
@@ -147,6 +161,8 @@ protected:
 
     //! Function that returns body's inertia tensor
     std::function< Eigen::Matrix3d( ) > inertiaTensorFunction_;
+
+    std::function< Eigen::Matrix3d( ) > inertiaTensorDerivativeFunction_;
 
     //! Current torque, as computed by last call to updateMembers function
     Eigen::Vector3d currentTorque_;

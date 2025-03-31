@@ -170,6 +170,15 @@ double calculateSphericalHarmonicGravitationalPotential(
         std::shared_ptr< basic_mathematics::SphericalHarmonicsCache > sphericalHarmonicsCache,
         const int minimumumDegree = 0, const int minimumumOrder = 0 );
 
+Eigen::Matrix3d computeDerivativeInertiaTensor(
+        const double derivativeC20Coefficient,
+        const double derivativeC21Coefficient,
+        const double derivativeC22Coefficient,
+        const double derivativeS21Coefficient,
+        const double derivativeS22Coefficient,
+        const double bodyMass,
+        const double referenceRadius );
+
 //! Class to represent a spherical harmonic gravity field expansion.
 /*!
  *  Class to represent a spherical harmonic gravity field expansion of a massive body with
@@ -214,6 +223,8 @@ public:
         sphericalHarmonicsCache_ = std::make_shared< basic_mathematics::SphericalHarmonicsCache >( );
         sphericalHarmonicsCache_->resetMaximumDegreeAndOrder( maximumDegree_ + 2,
                                                               maximumOrder_ + 2 );
+
+        derivativeInertiaTensor_ = Eigen::Matrix3d::Zero( );
     }
 
     //! Virtual destructor.
@@ -484,6 +495,25 @@ public:
 
     virtual Eigen::Matrix3d getInertiaTensor(  );
 
+    void resetDerivativeInertiaTensor(
+        const double derivativeC20Coefficient,
+        const double derivativeC21Coefficient,
+        const double derivativeC22Coefficient,
+        const double derivativeS21Coefficient,
+        const double derivativeS22Coefficient )
+    {
+        derivativeInertiaTensor_ = computeDerivativeInertiaTensor( 
+            derivativeC20Coefficient, derivativeC21Coefficient, derivativeC22Coefficient,  derivativeS21Coefficient,
+            derivativeS22Coefficient, 
+            this->getGravitationalParameter( ) / physical_constants::GRAVITATIONAL_CONSTANT, 
+            referenceRadius_ );
+    }
+
+    Eigen::Matrix3d getDerivativeInertiaTensor(  )
+    {
+        return derivativeInertiaTensor_;
+    }
+
     double getScaledMeanMomentOfInertia( )
     {
         return scaledMeanMomentOfInertia_;
@@ -527,6 +557,8 @@ protected:
 
     //! Cache object for potential calculations.
     std::shared_ptr< basic_mathematics::SphericalHarmonicsCache > sphericalHarmonicsCache_;
+
+    Eigen::Matrix3d derivativeInertiaTensor_;
 };
 
 //! Function to determine a body's inertia tensor from its degree two unnormalized gravity field coefficients

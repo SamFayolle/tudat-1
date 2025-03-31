@@ -79,6 +79,7 @@ createMaxwellGravityFieldDeformationModel(
                     perturbingBody->getGravitationalParameter( ),
                     sphericalHarmonicsGravityField->getReferenceRadius( ),
                     std::bind( &Body::getCurrentAngularVelocityVectorInLocalFrame, deformingBody ),
+                    std::bind( &Body::getCurrentAngularVelocityDerivativeVectorInLocalFrame, deformingBody ),
                     maxwellDeformationSettings->loveNumber_,
                     std::bind( &SphericalHarmonicsGravityField::getCosineCoefficientsBlock,
                                 sphericalHarmonicsGravityField,
@@ -90,7 +91,8 @@ createMaxwellGravityFieldDeformationModel(
                                 maxwellDeformationSettings->maximumOrder_ ),
                     std::bind( &Body::getStateByReference, perturbingBody, std::placeholders::_1 ),
                     std::bind( &Body::getCurrentRotationToGlobalFrame, deformingBody ),
-                    std::bind( &Body::getCurrentRotationMatrixDerivativeToLocalFrame, deformingBody ) );
+                    std::bind( &Body::getCurrentRotationMatrixDerivativeToLocalFrame, deformingBody ),
+                    maxwellDeformationSettings->staticCoefficients_ );
         }
     }
     return deformationModel;
@@ -249,6 +251,7 @@ basic_astrodynamics::GravityDeformationModelMap createGravityDeformationModelsMa
     return gravityDeformationModels;
 
 }
+
 
 } // namespace simulation_setup
 

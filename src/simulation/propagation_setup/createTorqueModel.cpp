@@ -28,8 +28,10 @@ std::shared_ptr< basic_astrodynamics::InertialTorqueModel > createInertialTorque
             std::bind( &Body::getCurrentAngularVelocityVectorInLocalFrame, bodyUndergoingTorque );
     std::function< Eigen::Matrix3d( ) > inertiaTensorFunction =
             std::bind( &Body::getBodyInertiaTensor, bodyUndergoingTorque );
+    std::function< Eigen::Matrix3d( ) > inertiaTensorDerivativeFunction = 
+            std::bind( &Body::getBodyInertiaTensorDerivative, bodyUndergoingTorque );
     return std::make_shared< basic_astrodynamics::InertialTorqueModel >(
-                angularVelocityFunction, inertiaTensorFunction );
+                angularVelocityFunction, inertiaTensorFunction, inertiaTensorDerivativeFunction );
 }
 
 //! Function to create an aerodynamic torque model.
@@ -160,6 +162,7 @@ std::shared_ptr< gravitation::SphericalHarmonicGravitationalTorqueModel > create
         const std::string& nameOfBodyUndergoingTorque,
         const std::string& nameOfBodyExertingTorque )
 {
+    std::cout << "createSphericalHarmonicGravitationalTorqueModel " << nameOfBodyExertingTorque << " on " << nameOfBodyUndergoingTorque << std::endl;
     std::shared_ptr< SphericalHarmonicTorqueSettings > sphericalHarmonicTorqueSettings =
             std::dynamic_pointer_cast< SphericalHarmonicTorqueSettings >( torqueSettings );
 

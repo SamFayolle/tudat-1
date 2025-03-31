@@ -20,6 +20,7 @@
 #define TUDAT_COORDINATE_CONVERSIONS_H
 
 #include <vector>
+#include "iostream"
 
 #include <Eigen/Core>
 

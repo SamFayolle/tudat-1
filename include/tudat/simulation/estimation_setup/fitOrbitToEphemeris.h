@@ -125,7 +125,6 @@ std::shared_ptr< EstimationOutput< StateScalarType, TimeType > > createBestFitTo
         createParametersToEstimate< StateScalarType, TimeType >( parameterNames, bodies, propagatorSettings );
     printEstimatableParameterEntries( parametersToEstimate );
 
-
     std::pair< std::vector< std::shared_ptr< observation_models::ObservationModelSettings > >,
         std::shared_ptr< observation_models::ObservationCollection< StateScalarType, TimeType > > >
         observationCollectionAndModelSettings = simulatePseudoObservations< TimeType, StateScalarType >(

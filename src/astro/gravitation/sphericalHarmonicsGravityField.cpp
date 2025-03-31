@@ -34,6 +34,11 @@ Eigen::Matrix3d SphericalHarmonicsGravityField::getInertiaTensor(  )
     return gravitation::getInertiaTensorFromGravityField( shared_from_this(), scaledMeanMomentOfInertia_ );
 }
 
+// Eigen::Matrix3d SphericalHarmonicsGravityField::getDerivativeInertiaTensor(  )
+// {
+//     return gravitation::getDerivativeInertiaTensorFromGravityField( shared_from_this() );
+// }
+
 //! Compute gravitational acceleration due to multiple spherical harmonics terms, defined using geodesy-normalization.
 Eigen::Vector3d computeGeodesyNormalizedGravitationalAccelerationSum(
         const Eigen::Vector3d& positionOfBodySubjectToAcceleration,
@@ -260,6 +265,8 @@ Eigen::Matrix3d getInertiaTensor(
         const double bodyMass,
         const double referenceRadius )
 {
+//     std::cout << "getInertiaTensor " << c20Coefficient << " " << c21Coefficient << " " << c22Coefficient << " " << 
+        // s21Coefficient << " " << s22Coefficient << std::endl;
     // Compute inertia tensor
     double scalingConstant = bodyMass * referenceRadius * referenceRadius;
     Eigen::Matrix3d inertiaTensor =
@@ -283,6 +290,32 @@ Eigen::Matrix3d getInertiaTensor(
                 unnormalizedCosineCoefficients( 2, 2 ),
                 unnormalizedSineCoefficients( 2, 1 ), unnormalizedSineCoefficients( 2, 2 ),
                 scaledMeanMomentOfInertia, bodyMass, referenceRadius );
+}
+
+//! Function to determine the time derivative of a body's inertia tensor from its degree two unnormalized gravity field coefficients
+Eigen::Matrix3d computeDerivativeInertiaTensor(
+        const double derivativeC20Coefficient,
+        const double derivativeC21Coefficient,
+        const double derivativeC22Coefficient,
+        const double derivativeS21Coefficient,
+        const double derivativeS22Coefficient,
+        const double bodyMass,
+        const double referenceRadius )
+{
+    // Compute inertia tensor
+    double scalingConstant = bodyMass * referenceRadius * referenceRadius;
+    Eigen::Matrix3d derivativeInertiaTensor =
+            ( Eigen::Matrix3d( )<< derivativeC20Coefficient / 3.0 - 2.0 * derivativeC22Coefficient, 
+            -2.0 * derivativeS22Coefficient, 
+            - derivativeC21Coefficient,
+            -2.0 * derivativeS22Coefficient, 
+            derivativeC20Coefficient / 3.0 + 2.0 * derivativeC22Coefficient, 
+            - derivativeS21Coefficient,
+            - derivativeC21Coefficient, 
+            - derivativeS21Coefficient, 
+            -2.0 * derivativeC20Coefficient / 3.0 ).finished( );
+
+    return scalingConstant * derivativeInertiaTensor;
 }
 
 //! Function to determine a body's inertia tensor from its gravity field model

@@ -83,8 +83,9 @@ public:
      * Constructor.
      * \param integratedStateType Type of dynamics for whichh the state derivative is calculated.
      */
-    SingleStateTypeDerivative( const IntegratedStateType integratedStateType ):
-        integratedStateType_( integratedStateType )
+    SingleStateTypeDerivative( const IntegratedStateType integratedStateType,
+                               const std::vector< std::string >& bodiesToIntegrate = std::vector< std::string >( ) ):
+        integratedStateType_( integratedStateType ), bodiesToIntegrate_( bodiesToIntegrate )
     {
         if( isStateToBePostProcessed( ) )
         {
@@ -234,6 +235,11 @@ public:
         return false;
     }
 
+    virtual std::vector< std::string > getBodiesToIntegrate( )
+    {
+        return bodiesToIntegrate_;
+    }
+
 protected:
 
     // Type of dynamics for which the state derivative is calculated.
@@ -241,6 +247,8 @@ protected:
 
     // Vector used during post-processing of state.
     Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 > unprocessedState_;
+
+    std::vector< std::string > bodiesToIntegrate_;
 };
 
 //extern template class SingleStateTypeDerivative< double, double >;

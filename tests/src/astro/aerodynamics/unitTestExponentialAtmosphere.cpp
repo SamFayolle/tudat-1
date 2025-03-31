@@ -102,7 +102,7 @@ BOOST_AUTO_TEST_CASE( testExponentialAtmosphereAt10km )
                 scaleHeight, constantTemperature, densityAtZeroAltitude );
 
     // Create an exponential atmosphere object.
-    aerodynamics::ExponentialAtmosphere defaultExponentialAtmosphere( aerodynamics::earth );
+    aerodynamics::ExponentialAtmosphere defaultExponentialAtmosphere( aerodynamics::earth_ea );
 
     // Declare and set expected density.
     const double expectedDensity  = densityAtZeroAltitude * std::exp ( -altitude / scaleHeight );

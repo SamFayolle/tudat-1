@@ -181,7 +181,7 @@ BOOST_AUTO_TEST_CASE( test_gravityDeformationModel )
 
     // Specify initial time
     double initialTime = 0.0;
-    double finalTime = 86400.0; //1.0 * physical_constants::JULIAN_DAY;
+    double finalTime = 600.0 / 10.0; //1.0 * physical_constants::JULIAN_DAY;
 
     std::vector< std::string > bodiesToCreate = { "Jupiter", "Io", "Europa", "Ganymede", "Callisto" }; 
 
@@ -233,25 +233,37 @@ BOOST_AUTO_TEST_CASE( test_gravityDeformationModel )
     // std::cout << "initial rotation rate " << rotationRate << std::endl;
 
     std::shared_ptr< MaxwellDeformationSettings > maxwellDeformationSettings = std::make_shared< MaxwellDeformationSettings >( 
-        maxwellRelaxationTime, globalRelaxationTime, loveNumber, rotationRateIo, maximumDegree, maximumOrder, "Jupiter" );
+        maxwellRelaxationTime, globalRelaxationTime, loveNumber, /*rotationRateIo,*/ maximumDegree, maximumOrder, "Jupiter" );
 
-    std::shared_ptr< Body > deformingBody = bodies.at( "Io" );
-    std::shared_ptr< Body > perturbingBody = bodies.at( "Jupiter" );
-    std::shared_ptr< basic_astrodynamics::MaxwellGravityDeformationModel > maxwellDeformationModel = 
-        createMaxwellGravityFieldDeformationModel( deformingBody, perturbingBody, "Io", "Jupiter", maxwellDeformationSettings );
+    // std::shared_ptr< Body > deformingBody = bodies.at( "Io" );
+    // std::shared_ptr< Body > perturbingBody = bodies.at( "Jupiter" );
+    // std::shared_ptr< basic_astrodynamics::MaxwellGravityDeformationModel > maxwellDeformationModel = 
+    //     createMaxwellGravityFieldDeformationModel( deformingBody, perturbingBody, "Io", "Jupiter", maxwellDeformationSettings );
+
+    // std::map< std::string, std::shared_ptr< basic_astrodynamics::GravityDeformationModel > > gravityDeformationModels;
+    // gravityDeformationModels[ "Io" ] = maxwellDeformationModel;
+
+    
+    std::map< std::string, std::vector< std::shared_ptr< GravityDeformationSettings > > > gravityDeformationModelMap;   
+    gravityDeformationModelMap[ "Io" ] = { maxwellDeformationSettings };
+
+    basic_astrodynamics::GravityDeformationModelMap deformationModels = createGravityDeformationModelsMap(
+        bodies, gravityDeformationModelMap );
 
     std::map< std::string, std::shared_ptr< basic_astrodynamics::GravityDeformationModel > > gravityDeformationModels;
-    gravityDeformationModels[ "Io" ] = maxwellDeformationModel;
+    gravityDeformationModels[ "Io" ] = deformationModels.at( "Io" )[ 0 ];
+
+
 
     double timeStep = 60.0;
-    std::shared_ptr< IntegratorSettings< > > integratorSettings = std::make_shared< RungeKuttaVariableStepSizeSettings< > >
-                ( initialTime, timeStep, rungeKuttaFehlberg78, timeStep, timeStep );  
-    // std::shared_ptr< IntegratorSettings< > > integratorSettings =
-                    // std::make_shared< IntegratorSettings< > >
-                    // ( rungeKutta4, initialTime, timeStep );
+    // std::shared_ptr< IntegratorSettings< > > integratorSettings = std::make_shared< RungeKuttaVariableStepSizeSettings< > >
+                // ( initialTime, timeStep, rungeKuttaFehlberg78, timeStep, timeStep );  
+    std::shared_ptr< IntegratorSettings< > > integratorSettings =
+                    std::make_shared< IntegratorSettings< > >
+                    ( rungeKutta4, initialTime, timeStep );
 
     std::vector< std::string > bodiesToPropagate = { "Io" };
-    Eigen::Matrix< double, Eigen::Dynamic, 1 > initialBodyGravity = Eigen::Matrix< double, Eigen::Dynamic, 1 >::Zero( 3, 1 );
+    // Eigen::Matrix< double, Eigen::Dynamic, 1 > initialBodyGravity = Eigen::Matrix< double, Eigen::Dynamic, 1 >::Zero( 3, 1 );
 
     Eigen::Vector3d computedEquilibriumCoefficients = Eigen::Vector3d::Zero( );
     std::shared_ptr< SphericalHarmonicsGravityField > shModel = std::dynamic_pointer_cast< SphericalHarmonicsGravityField >( bodies.at( "Io" )->getGravityFieldModel( ) );

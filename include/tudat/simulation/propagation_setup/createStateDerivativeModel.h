@@ -305,6 +305,14 @@ std::shared_ptr< SingleStateTypeDerivative< StateScalarType, TimeType > > create
                                bodies.at( rotationPropagatorSettings->bodiesToIntegrate_.at( i ) ) ) );
     }
 
+    std::vector< std::function< Eigen::Matrix3d( ) > > momentOfInertiaDerivativeFunctions;
+    for( unsigned int i = 0; i < rotationPropagatorSettings->bodiesToIntegrate_.size( ); i++ )
+    {
+        momentOfInertiaDerivativeFunctions.push_back(
+                    std::bind( &simulation_setup::Body::getBodyInertiaTensorDerivative,
+                               bodies.at( rotationPropagatorSettings->bodiesToIntegrate_.at( i ) ) ) );
+    }
+
     // Check propagator type and create corresponding state derivative object.
     std::shared_ptr< SingleStateTypeDerivative< StateScalarType, TimeType > > stateDerivativeModel;
     switch( rotationPropagatorSettings->propagator_ )
@@ -313,21 +321,21 @@ std::shared_ptr< SingleStateTypeDerivative< StateScalarType, TimeType > > create
     {
         stateDerivativeModel = std::make_shared< RotationalMotionQuaternionsStateDerivative< StateScalarType, TimeType > >(
                     rotationPropagatorSettings->getTorqueModelsMap( ), rotationPropagatorSettings->bodiesToIntegrate_,
-                    momentOfInertiaFunctions );
+                    momentOfInertiaFunctions, momentOfInertiaDerivativeFunctions );
         break;
     }
     case modified_rodrigues_parameters:
     {
         stateDerivativeModel = std::make_shared< RotationalMotionModifiedRodriguesParametersStateDerivative< StateScalarType, TimeType > >(
                     rotationPropagatorSettings->getTorqueModelsMap( ), rotationPropagatorSettings->bodiesToIntegrate_,
-                    momentOfInertiaFunctions );
+                    momentOfInertiaFunctions, momentOfInertiaDerivativeFunctions );
         break;
     }
     case exponential_map:
     {
         stateDerivativeModel = std::make_shared< RotationalMotionExponentialMapStateDerivative< StateScalarType, TimeType > >(
                     rotationPropagatorSettings->getTorqueModelsMap( ), rotationPropagatorSettings->bodiesToIntegrate_,
-                    momentOfInertiaFunctions );
+                    momentOfInertiaFunctions, momentOfInertiaDerivativeFunctions );
         break;
     }
     default:

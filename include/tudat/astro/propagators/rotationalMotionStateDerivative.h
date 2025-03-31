@@ -12,15 +12,13 @@
 #ifndef TUDAT_ROTATIONAL_MOTION_STATE_DERIVATIVE_H
 #define TUDAT_ROTATIONAL_MOTION_STATE_DERIVATIVE_H
 
-#include <vector>
-#include <map>
-#include <string>
-
-#include <memory>
 #include <functional>
+#include <map>
+#include <memory>
+#include <string>
+#include <vector>
 
 #include "tudat/astro/basic_astro/torqueModel.h"
-
 #include "tudat/astro/propagators/singleStateTypeDerivative.h"
 #include "tudat/simulation/environment_setup/body.h"
 
@@ -32,8 +30,7 @@ namespace propagators
 
 // Enum listing propagator types for rotational dynamics that can be used.
 //! @get_docstring(AvailableAcceleration.__docstring__)
-enum RotationalPropagatorType
-{
+enum RotationalPropagatorType {
     undefined_rotational_propagator = -1,
     quaternions = 0,
     modified_rodrigues_parameters = 1,
@@ -46,54 +43,57 @@ int getRotationalStateSize( const RotationalPropagatorType propagatorType );
 
 // Function to evaluated the classical rotational equations of motion (Euler equations)
 /*
- * Function to evaluated the classical rotational equations of motion (Euler equations). The function returns the time-derivative
- * of a body's angular velocity vector, expressed in its body-fixed frame
- * \param inertiaTensor Inertia tensor of body, expressed in its body-fixed frame
+ * Function to evaluated the classical rotational equations of motion (Euler equations). The
+ * function returns the time-derivative of a body's angular velocity vector, expressed in its
+ * body-fixed frame \param inertiaTensor Inertia tensor of body, expressed in its body-fixed frame
  * \param totalTorque Total torque acting on body, expressed in its body-fixed frame
- * \param angularVelocityVector Current angular velocity vector of body, expressed in its body-fixed frame
- * \param inertiaTensorTimeDerivative Time derivative of inertiaTensor (default zero)
- * \return Time-derivative of a body's angular velocity vector, expressed in its body-fixed frame
+ * \param angularVelocityVector Current angular velocity vector of body, expressed in its body-fixed
+ * frame \param inertiaTensorTimeDerivative Time derivative of inertiaTensor (default zero) \return
+ * Time-derivative of a body's angular velocity vector, expressed in its body-fixed frame
  */
 Eigen::Vector3d evaluateRotationalEquationsOfMotion(
-        const Eigen::Matrix3d& inertiaTensor, const Eigen::Vector3d& totalTorque,
+        const Eigen::Matrix3d& inertiaTensor,
+        const Eigen::Vector3d& totalTorque,
         const Eigen::Vector3d& angularVelocityVector,
         const Eigen::Matrix3d& inertiaTensorTimeDerivative = Eigen::Matrix3d::Zero( ) );
 
 // Class for computing the state derivative for rotational dynamics of N bodies.
 /*
- *  Class for computing the state derivative for rotational dynamics of N bodies, using quaternion from body-fixed to inertial
- *  frame (in quaternion format) and angular velocity-vector of body expressed in body-fixed frame as the rotational state of a
- *  single body
+ *  Class for computing the state derivative for rotational dynamics of N bodies, using quaternion
+ * from body-fixed to inertial frame (in quaternion format) and angular velocity-vector of body
+ * expressed in body-fixed frame as the rotational state of a single body
  */
 template< typename StateScalarType = double, typename TimeType = double >
-class RotationalMotionStateDerivative: public propagators::SingleStateTypeDerivative< StateScalarType, TimeType >
+class RotationalMotionStateDerivative
+    : public propagators::SingleStateTypeDerivative< StateScalarType, TimeType >
 {
-public:
-
-    using propagators::SingleStateTypeDerivative< StateScalarType, TimeType >::calculateSystemStateDerivative;
+   public:
+    using propagators::SingleStateTypeDerivative< StateScalarType,
+                                                  TimeType >::calculateSystemStateDerivative;
 
     // Constructor.
     /*
      * Constructor.
-     * \param torqueModelsPerBody List of torque models (first map key body undergoing acceleration, second map key body exerting
-     * acceleration).
-     * \param propagatorType Type of propagator that is to be used (i.e. quaternions, etc.)
-     * \param bodiesToPropagate List of names of bodies for which rotational state is to be propagated.
-     * \param bodyInertiaTensorFunctions List of functions returning inertia tensors of bodiesToPropagate (in same order).
-     * \param bodyInertiaTensorTimeDerivativeFunctions List of functions returning time derivatives of inertia tensors of
-     * bodiesToPropagate (in same order). Default empty, denoting time-invariant inertia tensors.
+     * \param torqueModelsPerBody List of torque models (first map key body undergoing acceleration,
+     * second map key body exerting acceleration). \param propagatorType Type of propagator that is
+     * to be used (i.e. quaternions, etc.) \param bodiesToPropagate List of names of bodies for
+     * which rotational state is to be propagated. \param bodyInertiaTensorFunctions List of
+     * functions returning inertia tensors of bodiesToPropagate (in same order). \param
+     * bodyInertiaTensorTimeDerivativeFunctions List of functions returning time derivatives of
+     * inertia tensors of bodiesToPropagate (in same order). Default empty, denoting time-invariant
+     * inertia tensors.
      */
     RotationalMotionStateDerivative(
             const basic_astrodynamics::TorqueModelMap& torqueModelsPerBody,
             const RotationalPropagatorType propagatorType,
             const std::vector< std::string >& bodiesToPropagate,
             std::vector< std::function< Eigen::Matrix3d( ) > > bodyInertiaTensorFunctions,
-            std::vector< std::function< Eigen::Matrix3d( ) > > bodyInertiaTensorTimeDerivativeFunctions =
-            std::vector< std::function< Eigen::Matrix3d( ) > >( ) ):
+            std::vector< std::function< Eigen::Matrix3d( ) > >
+                    bodyInertiaTensorTimeDerivativeFunctions =
+                            std::vector< std::function< Eigen::Matrix3d( ) > >( ) ) :
         propagators::SingleStateTypeDerivative< StateScalarType, TimeType >(
-            propagators::rotational_state ),
-        torqueModelsPerBody_( torqueModelsPerBody ),
-        propagatorType_( propagatorType ),
+                propagators::rotational_state, bodiesToPropagate ),
+        torqueModelsPerBody_( torqueModelsPerBody ), propagatorType_( propagatorType ),
         bodiesToPropagate_( bodiesToPropagate ),
         bodyInertiaTensorFunctions_( bodyInertiaTensorFunctions ),
         bodyInertiaTensorTimeDerivativeFunctions_( bodyInertiaTensorTimeDerivativeFunctions )
@@ -102,29 +102,32 @@ public:
         if( bodiesToPropagate_.size( ) != bodyInertiaTensorFunctions_.size( ) )
         {
             throw std::runtime_error(
-                        "Error when making rotational state derivative model, inertia tensor list is of incompatible size" );
+                    "Error when making rotational state derivative model, inertia tensor list is "
+                    "of incompatible size" );
         }
-
 
         if( bodyInertiaTensorTimeDerivativeFunctions_.size( ) == 0 )
         {
             for( unsigned int i = 0; i < bodiesToPropagate.size( ); i++ )
             {
-                bodyInertiaTensorTimeDerivativeFunctions_.push_back( [ ]( ){ return Eigen::Matrix3d::Zero( ); } );
+                bodyInertiaTensorTimeDerivativeFunctions_.push_back(
+                        []( ) { return Eigen::Matrix3d::Zero( ); } );
             }
         }
         else if( bodiesToPropagate_.size( ) != bodyInertiaTensorTimeDerivativeFunctions_.size( ) )
         {
             throw std::runtime_error(
-                        "Error when making rotational state derivative model, inertia tensor time derivative list is of incompatible size" );
+                    "Error when making rotational state derivative model, inertia tensor time "
+                    "derivative list is of incompatible size" );
         }
 
         for( unsigned int i = 0; i < bodiesToPropagate.size( ); i++ )
         {
             if( torqueModelsPerBody_.count( bodiesToPropagate.at( i ) ) == 0 )
             {
-                std::cerr<<"Warning, propagating rotational dynamics of body " + bodiesToPropagate.at( i )  +
-                           " without any torque models."<<std::endl;
+                std::cerr << "Warning, propagating rotational dynamics of body " +
+                                bodiesToPropagate.at( i ) + " without any torque models."
+                          << std::endl;
                 torqueModelsPerBody_[ bodiesToPropagate.at( i ) ][ bodiesToPropagate.at( i ) ] =
                         std::vector< std::shared_ptr< basic_astrodynamics::TorqueModel > >( );
             }
@@ -134,26 +137,30 @@ public:
     }
 
     // Destructor
-    virtual ~RotationalMotionStateDerivative( ){ }
+    virtual ~RotationalMotionStateDerivative( ) { }
 
     // Function to clear any reference/cached values of state derivative model
     /*
-     * Function to clear any reference/cached values of state derivative model, in addition to those performed in the
-     * clearTranslationalStateDerivativeModel function. Default implementation is empty.
+     * Function to clear any reference/cached values of state derivative model, in addition to those
+     * performed in the clearTranslationalStateDerivativeModel function. Default implementation is
+     * empty.
      */
-    virtual void clearDerivedRotationalStateDerivativeModel( ){ }
+    virtual void clearDerivedRotationalStateDerivativeModel( ) { }
 
     // Function to clear reference/cached values of acceleration models
     /*
-     * Function to clear reference/cached values of acceleration models, to ensure that they are all recalculated.
+     * Function to clear reference/cached values of acceleration models, to ensure that they are all
+     * recalculated.
      */
     void clearRotationalStateDerivativeModel( )
     {
         for( torqueModelMapIterator = torqueModelsPerBody_.begin( );
-             torqueModelMapIterator != torqueModelsPerBody_.end( ); torqueModelMapIterator++ )
+             torqueModelMapIterator != torqueModelsPerBody_.end( );
+             torqueModelMapIterator++ )
         {
-            for( innerTorqueIterator = torqueModelMapIterator->second.begin( ); innerTorqueIterator !=
-                 torqueModelMapIterator->second.end( ); innerTorqueIterator++ )
+            for( innerTorqueIterator = torqueModelMapIterator->second.begin( );
+                 innerTorqueIterator != torqueModelMapIterator->second.end( );
+                 innerTorqueIterator++ )
             {
                 for( unsigned int j = 0; j < innerTorqueIterator->second.size( ); j++ )
                 {
@@ -165,12 +172,12 @@ public:
 
     // Function to clear reference/cached values of translational state derivative model
     /*
-     * Function to clear reference/cached values of translational state derivative model. For each derived class, this
-     * entails resetting the current time in the acceleration models to NaN (see clearRotationalStateDerivativeModel).
-     * Every derived class requiring additional values to be cleared should implement the
-     * clearDerivedRotationalStateDerivativeModel function.
+     * Function to clear reference/cached values of translational state derivative model. For each
+     * derived class, this entails resetting the current time in the acceleration models to NaN (see
+     * clearRotationalStateDerivativeModel). Every derived class requiring additional values to be
+     * cleared should implement the clearDerivedRotationalStateDerivativeModel function.
      */
-    void clearStateDerivativeModel(  )
+    void clearStateDerivativeModel( )
     {
         clearRotationalStateDerivativeModel( );
         clearDerivedRotationalStateDerivativeModel( );
@@ -186,10 +193,12 @@ public:
     void updateStateDerivativeModel( const TimeType currentTime )
     {
         for( torqueModelMapIterator = torqueModelsPerBody_.begin( );
-             torqueModelMapIterator != torqueModelsPerBody_.end( ); torqueModelMapIterator++ )
+             torqueModelMapIterator != torqueModelsPerBody_.end( );
+             torqueModelMapIterator++ )
         {
-            for( innerTorqueIterator = torqueModelMapIterator->second.begin( ); innerTorqueIterator !=
-                 torqueModelMapIterator->second.end( ); innerTorqueIterator++ )
+            for( innerTorqueIterator = torqueModelMapIterator->second.begin( );
+                 innerTorqueIterator != torqueModelMapIterator->second.end( );
+                 innerTorqueIterator++ )
             {
                 for( unsigned int j = 0; j < innerTorqueIterator->second.size( ); j++ )
                 {
@@ -199,21 +208,24 @@ public:
         }
     }
 
-    // Function to convert the propagator-specific form of the state to the conventional form in the global frame.
+    // Function to convert the propagator-specific form of the state to the conventional form in the
+    // global frame.
     /*
      * Function to convert the propagator-specific form of the state to the conventional form in the
-     * global frame.  The conventional form for translational dynamics this is the quaternion from body-fixed to propagation frame
-     * (in vector form) and the body's angular velocity vector in body-fixed frame. For this class the 'conventional' and
-     * 'propagator-specific' forms are equal.
-     * \param internalSolution State in propagator-specific form (i.e. form that is used in
+     * global frame.  The conventional form for translational dynamics this is the quaternion from
+     * body-fixed to propagation frame (in vector form) and the body's angular velocity vector in
+     * body-fixed frame. For this class the 'conventional' and 'propagator-specific' forms are
+     * equal. \param internalSolution State in propagator-specific form (i.e. form that is used in
      * numerical integration).
      * \param time Current time at which the state is valid.
-     * \param currentRotationalState State (internalSolution), converted to the rotational state in 'conventional' format (equal
-     * in this case).
+     * \param currentRotationalState State (internalSolution), converted to the rotational state in
+     * 'conventional' format (equal in this case).
      */
     void convertCurrentStateToGlobalRepresentation(
-            const Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 >& internalSolution, const TimeType& time,
-            Eigen::Block< Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 > > currentRotationalState )
+            const Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 >& internalSolution,
+            const TimeType& time,
+            Eigen::Block< Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 > >
+                    currentRotationalState )
     {
         this->convertToOutputSolution( internalSolution, time, currentRotationalState );
     }
@@ -247,9 +259,8 @@ public:
     {
         // Check if body is propagated.
         Eigen::Vector3d totalTorque = Eigen::Vector3d::Zero( );
-        if( std::find( bodiesToPropagate_.begin( ),
-                       bodiesToPropagate_.end( ),
-                       bodyName ) == bodiesToPropagate_.end( ) )
+        if( std::find( bodiesToPropagate_.begin( ), bodiesToPropagate_.end( ), bodyName ) ==
+            bodiesToPropagate_.end( ) )
         {
             std::string errorMessage = "Error when getting total torque for body " + bodyName +
                     ", no such torque is found";
@@ -263,7 +274,7 @@ public:
                         torqueModelsPerBody_.at( bodyName );
 
                 // Iterate over all torques acting on body
-                for( innerTorqueIterator  = torquesOnBody.begin( );
+                for( innerTorqueIterator = torquesOnBody.begin( );
                      innerTorqueIterator != torquesOnBody.end( );
                      innerTorqueIterator++ )
                 {
@@ -298,39 +309,37 @@ public:
         return propagatorType_;
     }
 
-protected:
-
+   protected:
     void verifyInput( )
     {
         for( unsigned int i = 0; i < bodiesToPropagate_.size( ); i++ )
         {
             if( torqueModelsPerBody_.count( bodiesToPropagate_.at( i ) ) == 0 )
             {
-                throw std::runtime_error( "Error, requested propagation of rotational dynamics of body " +
-                                          bodiesToPropagate_.at( i ) +
-                                          ", but no torque models provided" );
+                throw std::runtime_error(
+                        "Error, requested propagation of rotational dynamics of body " +
+                        bodiesToPropagate_.at( i ) + ", but no torque models provided" );
             }
         }
 
-        for( auto it : torqueModelsPerBody_ )
+        for( auto it: torqueModelsPerBody_ )
         {
-            if( std::find( bodiesToPropagate_.begin( ),
-                           bodiesToPropagate_.end( ),
-                           it.first ) == bodiesToPropagate_.end( ) )
+            if( std::find( bodiesToPropagate_.begin( ), bodiesToPropagate_.end( ), it.first ) ==
+                bodiesToPropagate_.end( ) )
             {
-                throw std::runtime_error( "Error, provided torque models for body " +
-                                          it.first +
-                                          ", but this body is not included in list of bodies for which rotation is to be propagated." );
+                throw std::runtime_error( "Error, provided torque models for body " + it.first +
+                                          ", but this body is not included in list of bodies for "
+                                          "which rotation is to be propagated." );
             }
         }
     }
 
     // Function to get the total torques acting on each body, expressed in the body-fixed frames
     /*
-     * Function to get the total torques acting on each body, expressed in the body-fixed frames. The environment
-     * and torque models must have been updated to the current state before calling this
-     * function.
-     * \return Total torques acting on each body, expressed in the body-fixed frames (in order of bodiesToPropagate_).
+     * Function to get the total torques acting on each body, expressed in the body-fixed frames.
+     * The environment and torque models must have been updated to the current state before calling
+     * this function. \return Total torques acting on each body, expressed in the body-fixed frames
+     * (in order of bodiesToPropagate_).
      */
     std::vector< Eigen::Vector3d > sumTorquesPerBody( )
     {
@@ -346,13 +355,14 @@ protected:
 
             if( torqueModelsPerBody_.count( bodiesToPropagate_[ i ] ) != 0 )
             {
-                for( innerTorqueIterator  = torqueModelsPerBody_[ bodiesToPropagate_[ i ] ].begin( );
+                for( innerTorqueIterator = torqueModelsPerBody_[ bodiesToPropagate_[ i ] ].begin( );
                      innerTorqueIterator != torqueModelsPerBody_[ bodiesToPropagate_[ i ] ].end( );
                      innerTorqueIterator++ )
                 {
                     for( unsigned int j = 0; j < innerTorqueIterator->second.size( ); j++ )
                     {
                         torques[ i ] += ( innerTorqueIterator->second[ j ]->getTorque( ) );
+                        // std::cout << "single torque " << ( innerTorqueIterator->second[ j ]->getTorque( ) ).transpose( ) << std::endl;
                     }
                 }
             }
@@ -380,7 +390,8 @@ protected:
     // List of functions returning inertia tensors of bodiesToPropagate (in same order)
     std::vector< std::function< Eigen::Matrix3d( ) > > bodyInertiaTensorFunctions_;
 
-    //  List of functions returning time derivatives of inertia tensors of bodiesToPropagate (in same order)
+    //  List of functions returning time derivatives of inertia tensors of bodiesToPropagate (in
+    //  same order)
     std::vector< std::function< Eigen::Matrix3d( ) > > bodyInertiaTensorTimeDerivativeFunctions_;
 
     // Predefined iterator to save (de-)allocation time.
@@ -388,15 +399,12 @@ protected:
 
     // Predefined iterator to save (de-)allocation time.
     basic_astrodynamics::SingleBodyTorqueModelMap::iterator innerTorqueIterator;
-
 };
 
+// extern template class RotationalMotionStateDerivative< double, double >;
 
-//extern template class RotationalMotionStateDerivative< double, double >;
+}  // namespace propagators
 
+}  // namespace tudat
 
-} // namespace propagators
-
-} // namespace tudat
-
-#endif // TUDAT_ROTATIONAL_MOTION_STATE_DERIVATIVE_H
+#endif  // TUDAT_ROTATIONAL_MOTION_STATE_DERIVATIVE_H

@@ -47,7 +47,7 @@ public:
     GravityStateDerivative(
             const std::map< std::string, std::shared_ptr< basic_astrodynamics::GravityDeformationModel > >& gravityDeformationModels,
             const std::vector< std::string >& bodiesToIntegrate ):
-        propagators::SingleStateTypeDerivative< StateScalarType, TimeType >( propagators::gravity_deformation_state ),
+        propagators::SingleStateTypeDerivative< StateScalarType, TimeType >( propagators::gravity_deformation_state, bodiesToIntegrate ),
         bodiesToIntegrate_( bodiesToIntegrate )
     {
         for( std::map< std::string, std::shared_ptr< basic_astrodynamics::GravityDeformationModel > >::const_iterator modelIterator
@@ -174,6 +174,34 @@ public:
         }
     }
 
+    // Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 > getNominalCoefficients(
+    //     const Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 >& propagatedCoefficients, const TimeType& time )
+    // {
+    //     Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 > nominalCoefficients = 
+    //         Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 >::Zero( 3 * gravityDeformationModels_.size( ), 1 );
+
+    //     // Update local variables of gravity deformation model objects.
+    //     unsigned int counter = 0;
+    //     for( gravityDeformationModelIterator_ = gravityDeformationModels_.begin( );
+    //          gravityDeformationModelIterator_ != gravityDeformationModels_.end( );
+    //          gravityDeformationModelIterator_++ )
+    //     {
+    //         for( unsigned int i = 0; i < gravityDeformationModelIterator_->second.size( ); i++ )
+    //         {
+    //             std::shared_ptr< basic_astrodynamics::MaxwellGravityDeformationModel > maxwellModel = std::dynamic_pointer_cast<
+    //                 basic_astrodynamics::MaxwellGravityDeformationModel >( gravityDeformationModelIterator_->second.at ( i ) );
+    //             std::cout << "maxwellModel->computeNominalCoefficients( propagatedCoefficients ) " << 
+    //                 maxwellModel->computeNominalCoefficients( propagatedCoefficients ) << std::endl;
+    //             nominalCoefficients.block( 3 * counter, 0, 3, 1 ) = maxwellModel->computeNominalCoefficients( 
+    //                 propagatedCoefficients );
+    //             std::cout << "nominalCoefficients: " << nominalCoefficients.transpose( ) << std::endl;
+    //         }
+    //         counter += 1;
+    //     }
+    //     std::cout << "nominalCoefficients " << nominalCoefficients.transpose( ) << std::endl;
+    //     return nominalCoefficients;
+    // }
+
     //! Function included for compatibility purposes with base class, local and global representation is equal for gravity
     //! deformation model. Function returns (by reference) input internalSolution.
     void convertCurrentStateToGlobalRepresentation(
@@ -181,6 +209,8 @@ public:
             Eigen::Block< Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 > > currentCartesianLocalSoluton )
     {
         currentCartesianLocalSoluton = internalSolution;
+        // currentCartesianLocalSoluton = getNominalCoefficients( internalSolution, time );
+        // std::cout << "currentCartesianLocalSoluton " << currentCartesianLocalSoluton.transpose( ) << std::endl;
     }
 
     //! Function included for compatibility purposes with base class, input and output representation is equal for gravity 

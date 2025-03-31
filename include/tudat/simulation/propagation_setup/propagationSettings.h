@@ -1636,12 +1636,12 @@ private:
 
 void verifyInput( )
 {
-    if( this->initialStates_.rows( ) != static_cast< int >( bodiesWithGravityToPropagate_.size( ) ) )
+    if( this->initialStates_.rows( ) != static_cast< int >( 3 * bodiesWithGravityToPropagate_.size( ) ) )
     {
         throw std::runtime_error( "Error when defining body gravity deformation propagator settings, provided initial state size (" +
                                     std::to_string( this->initialStates_.rows( ) ) +
                                     ") is incompatible with list of bodies for which gravity deformation is to be propagated (size " +
-                                    3 * std::to_string( bodiesWithGravityToPropagate_.size( ) ) + ")");
+                                    std::to_string( 3 * bodiesWithGravityToPropagate_.size( ) ) + ")");
     }
 }
 
@@ -1659,19 +1659,17 @@ inline std::shared_ptr< GravityDeformationPropagatorSettings< StateScalarType, T
     const std::vector< std::string > bodiesWihGravityToPropagate,
     const std::map< std::string, std::vector< std::shared_ptr< basic_astrodynamics::GravityDeformationModel > > >& gravityDeformationModels,
     const Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 >& initialBodyGravity,
-    const TimeType& initialTime,
     const std::shared_ptr< numerical_integrators::IntegratorSettings< TimeType > > integratorSettings,
     const std::shared_ptr< PropagationTerminationSettings > terminationSettings,
     const std::vector< std::shared_ptr< SingleDependentVariableSaveSettings > > dependentVariablesToSave =
-    std::vector< std::shared_ptr< SingleDependentVariableSaveSettings > >( ),
+    std::vector< std::shared_ptr< SingleDependentVariableSaveSettings > >( ) ) /*,
     const std::shared_ptr< SingleArcPropagatorProcessingSettings > outputSettings =
-    std::make_shared< SingleArcPropagatorProcessingSettings >( ) )
+    std::make_shared< SingleArcPropagatorProcessingSettings >( ) )*/
 {
 return std::make_shared< GravityDeformationPropagatorSettings< StateScalarType, TimeType > >(
             bodiesWihGravityToPropagate,
             gravityDeformationModels, initialBodyGravity,
-            initialTime, integratorSettings, terminationSettings, dependentVariablesToSave,
-            outputSettings);
+            integratorSettings, terminationSettings, dependentVariablesToSave );
 }
 
 //template< typename StateScalarType = double, typename TimeType = double >

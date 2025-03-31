@@ -708,8 +708,6 @@ public:
             createAndSetIntegratedStateProcessors( );
         }
 
-        std::cout << "in single arc dynamics simulator constructor" << std::endl;
-
         // Create object that updates the environment during propagation
         try
         {
@@ -721,25 +719,35 @@ public:
             throw std::runtime_error( "Error when creating environment updater: "  + std::string( error.what( ) ) );
         }
 
+
         // Create object that calculates the complete state derivatives
         if( predefinedStateDerivativeModels.stateDerivativeModels_.size( ) == 0 )
         {
+            std::vector< std::shared_ptr< SingleStateTypeDerivative< StateScalarType, TimeType > > >
+            stateDerivativeModels = createStateDerivativeModels< StateScalarType, TimeType >(
+                            propagatorSettings_, bodies_, propagatorSettings_->getInitialTime( ) );
+            stateDerivativeUpdater_ = createStateDerivativeUpdaterForDynamicalEquations( propagatorSettings_, stateDerivativeModels, bodies );
             dynamicsStateDerivative_ = std::make_shared< DynamicsStateDerivativeModel< TimeType, StateScalarType > >(
-                        createStateDerivativeModels< StateScalarType, TimeType >(
-                            propagatorSettings_, bodies_, propagatorSettings_->getInitialTime( ) ),
+                        stateDerivativeModels /* createStateDerivativeModels< StateScalarType, TimeType >(
+                            propagatorSettings_, bodies_, propagatorSettings_->getInitialTime( ) ) */,
                         std::bind( &EnvironmentUpdater< StateScalarType, TimeType >::updateEnvironment,
-                                     environmentUpdater_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3 ) );
+                                     environmentUpdater_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3 ),
+                        std::shared_ptr< VariationalEquations >( ), stateDerivativeUpdater_ );
         }
         else
         {
+            stateDerivativeUpdater_ = createStateDerivativeUpdaterForDynamicalEquations( 
+                propagatorSettings_, predefinedStateDerivativeModels.stateDerivativeModels_, bodies );
             dynamicsStateDerivative_ = std::make_shared< DynamicsStateDerivativeModel< TimeType, StateScalarType > >(
                         predefinedStateDerivativeModels.stateDerivativeModels_,
                         std::bind( &EnvironmentUpdater< StateScalarType, TimeType >::updateEnvironment,
-                                     environmentUpdater_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3 ) );
+                                     environmentUpdater_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3 ),
+            std::shared_ptr< VariationalEquations >( ), stateDerivativeUpdater_ );
         }
         stateDerivativeFunction_ =
                 std::bind( &DynamicsStateDerivativeModel< TimeType, StateScalarType >::computeStateDerivative,
                            dynamicsStateDerivative_, std::placeholders::_1, std::placeholders::_2 );
+
 
         // Create object that determines if the propagation is to be terminated
         propagationTerminationCondition_ = createPropagationTerminationConditions(
@@ -784,6 +792,7 @@ public:
                 propagatorSettings_->getDependentVariablesToSave( ),
                 dependentVariableIds_,
                 orderedDependentVariableSettings_, bodies );
+
 
         propagationResults_= std::make_shared< SingleArcSimulationResults< StateScalarType, TimeType > >(
                     integratedStateAndBodyList, propagatorSettings_->getOutputSettingsWithCheck( ),
@@ -1236,6 +1245,8 @@ protected:
      * function automatically updates all dependent variables that are needed to calulate the state derivative.
      */
     std::shared_ptr< EnvironmentUpdater< StateScalarType, TimeType > > environmentUpdater_;
+
+    std::shared_ptr< StateDerivativeUpdater< StateScalarType, TimeType > > stateDerivativeUpdater_;
 
     //! Interface object that updates current environment and returns state derivative from single function call.
     std::shared_ptr< DynamicsStateDerivativeModel< TimeType, StateScalarType > > dynamicsStateDerivative_;

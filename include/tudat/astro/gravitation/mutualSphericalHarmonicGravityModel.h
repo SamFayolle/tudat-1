@@ -127,7 +127,8 @@ public:
             sphericalHarmonicsCacheOfBodyUndergoingAcceleration =
             std::make_shared< basic_mathematics::SphericalHarmonicsCache >( ) ):
         useCentralBodyFixedFrame_( useCentralBodyFixedFrame ),
-        gravitationalParameterFunction_( gravitationalParameterFunction )
+        gravitationalParameterFunction_( gravitationalParameterFunction ),
+        toLocalFrameOfBodyUndergoingAccelerationTransformation_( toLocalFrameOfBodyUndergoingAccelerationTransformation )
     {
 
         // Create spherical harmonic acceleration due to expansion of body exerting acceleration
@@ -169,6 +170,10 @@ public:
         this->currentTime_ = currentTime;
         this->currentAcceleration_ = accelerationModelFromShExpansionOfBodyExertingAcceleration_->getAcceleration( ) -
                 accelerationModelFromShExpansionOfBodyUndergoingAcceleration_->getAcceleration( );
+        // std::cout << ( toLocalFrameOfBodyUndergoingAccelerationTransformation_( ).inverse( ) *
+        //      accelerationModelFromShExpansionOfBodyExertingAcceleration_->getAcceleration( ) ).transpose( ) << std::endl;
+        // std::cout << ( toLocalFrameOfBodyUndergoingAccelerationTransformation_( ).inverse( ) *
+        //      accelerationModelFromShExpansionOfBodyUndergoingAcceleration_->getAcceleration( ) ).transpose( ) << std::endl;
     }
 
     //! Function to reset the current time
@@ -252,6 +257,8 @@ protected:
      */
     std::shared_ptr< SphericalHarmonicsGravitationalAccelerationModel >
         accelerationModelFromShExpansionOfBodyUndergoingAcceleration_;
+
+    std::function< Eigen::Quaterniond( ) > toLocalFrameOfBodyUndergoingAccelerationTransformation_;
 
 
 };

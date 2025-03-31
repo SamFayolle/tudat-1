@@ -74,6 +74,10 @@ Eigen::Vector3d evaluateRotationalEquationsOfMotion(
 
         throw std::runtime_error( "Error when evaluating rotational equations of motion, inverse inertia tensor contains NaN. ");
     }
+    // std::cout << "inertiaTensor" << std::endl;
+    // std::cout << inertiaTensor << std::endl;
+    // std::cout << "inertiaTensorTimeDerivative" << std::endl;
+    // std::cout << inertiaTensorTimeDerivative << std::endl;
     return inverseInertiaTensor * ( totalTorque );
 }
 

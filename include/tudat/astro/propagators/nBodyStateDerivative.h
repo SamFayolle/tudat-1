@@ -120,7 +120,7 @@ public:
                           const std::vector< std::string >& bodiesToIntegrate,
                           const bool removeCentralTerm = false ):
         propagators::SingleStateTypeDerivative< StateScalarType, TimeType >(
-            propagators::translational_state ),
+            propagators::translational_state, bodiesToIntegrate ),
         accelerationModelsPerBody_( accelerationModelsPerBody ),
         removedCentralAccelerations_( std::map< std::string, std::shared_ptr< gravitation::CentralGravitationalAccelerationModel3d > >( ) ),
         updateRemovedAccelerations_( std::vector< std::string >( ) ),

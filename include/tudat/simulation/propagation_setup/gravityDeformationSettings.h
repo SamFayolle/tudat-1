@@ -15,17 +15,13 @@
 #include <memory>
 #include <map>
 #include <string>
+#include "tudat/astro/basic_astro/gravityDeformationModelTypes.h"
 
 namespace tudat
 {
 
 namespace simulation_setup
 {
-
-enum GravityDeformationType
-{
-    maxwell_deformation = 0
-};
 
 // Class for providing settings for gravity deformation models.
 /*
@@ -40,14 +36,14 @@ public:
     *  Constructor, sets type of deformation.
     *  \param deformationType Type of acceleration from GravityDeformationType enum.
     */
-GravityDeformationSettings( const simulation_setup::GravityDeformationType deformationType ):
+GravityDeformationSettings( const basic_astrodynamics::GravityDeformationType deformationType ):
     deformationType_( deformationType ){ }
 
 // Destructor.
 virtual ~GravityDeformationSettings( ){ }
 
 // Type of acceleration from AvailableAcceleration enum.
-GravityDeformationType deformationType_;
+basic_astrodynamics::GravityDeformationType deformationType_;
 
 };
 
@@ -64,13 +60,14 @@ MaxwellDeformationSettings(
     const double maxwellRelaxationTime, 
     const double globalRelaxationTime,
     const double loveNumber,
-    const double rotationRate,
     const int maximumDegree,
     const int maximumOrder,
-    const std::string perturbingBody ):
-    GravityDeformationSettings( maxwell_deformation ), maxwellRelaxationTime_( maxwellRelaxationTime ),
-    globalRelaxationTime_( globalRelaxationTime ), loveNumber_( loveNumber ), rotationRate_( rotationRate ),
-    maximumDegree_( maximumDegree ), maximumOrder_( maximumOrder ), perturbingBody_( perturbingBody )
+    const std::string perturbingBody,
+    const Eigen::VectorXd staticCoefficients = Eigen::VectorXd::Zero( 3 ) ):
+    GravityDeformationSettings( basic_astrodynamics::maxwell_deformation ), maxwellRelaxationTime_( maxwellRelaxationTime ),
+    globalRelaxationTime_( globalRelaxationTime ), loveNumber_( loveNumber ), 
+    maximumDegree_( maximumDegree ), maximumOrder_( maximumOrder ), perturbingBody_( perturbingBody ), 
+    staticCoefficients_( staticCoefficients )
     {
         
     }
@@ -81,14 +78,27 @@ virtual ~MaxwellDeformationSettings( ){ }
 const double maxwellRelaxationTime_;
 const double globalRelaxationTime_;
 const double loveNumber_;
-const double rotationRate_;
 const int maximumDegree_;
 const int maximumOrder_;
 const std::string perturbingBody_;
+Eigen::VectorXd staticCoefficients_;
 
 };
 
 typedef std::map< std::string, std::vector< std::shared_ptr< GravityDeformationSettings > > > SelectedGravityDeformationModelMap;
+
+inline std::shared_ptr< GravityDeformationSettings > maxwellDeformationSettings(
+    const double maxwellRelaxationTime, 
+    const double globalRelaxationTime,
+    const double loveNumber,
+    const int maximumDegree,
+    const int maximumOrder,
+    const std::string perturbingBody,
+    const Eigen::VectorXd staticCoefficients = Eigen::VectorXd::Zero( 3 ) )
+{
+    return std::make_shared< MaxwellDeformationSettings >( maxwellRelaxationTime, globalRelaxationTime, loveNumber,
+        maximumDegree, maximumOrder, perturbingBody, staticCoefficients );
+}
 
 
 } // namespace simulation_setup
