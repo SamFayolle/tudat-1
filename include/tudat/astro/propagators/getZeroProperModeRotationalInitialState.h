@@ -35,6 +35,13 @@ inline Eigen::Matrix3d getDissipationMatrix( const double dampingTime, const Eig
     return inertiaTensor / dampingTime;
 }
 
+inline Eigen::Matrix3d getDissipationMatrix2(
+        const double dampingTime,
+        const std::function< Eigen::Matrix3d() >& inertiaTensorFunction )
+{
+    return inertiaTensorFunction( ) / dampingTime;
+}
+
 //! Function to integrate forward in time with synthetic dissipation, and subsequently backwards without dissipation
 /*!
  *  Function to integrate forward in time with synthetic dissipation, and subsequently backwards without dissipation. This
@@ -50,7 +57,7 @@ inline Eigen::Matrix3d getDissipationMatrix( const double dampingTime, const Eig
 template< typename StateScalarType = double, typename TimeType = double >
 void integrateForwardWithDissipationAndBackwardsWithout(
         const std::shared_ptr< SingleArcDynamicsSimulator< StateScalarType, TimeType > > dynamicsSimulator,
-        const std::shared_ptr< basic_astrodynamics::DissipativeTorqueModel > dissipativeTorque,
+        const std::vector< std::shared_ptr< basic_astrodynamics::DissipativeTorqueModel > > dissipativeTorques,
         std::pair< std::map< TimeType, Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 > >,
                    std::map< TimeType, Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 > > >& propagatedStates,
         std::pair< std::map< TimeType, Eigen::Matrix< double, Eigen::Dynamic, 1 > >,
@@ -64,12 +71,21 @@ void integrateForwardWithDissipationAndBackwardsWithout(
     std::shared_ptr< numerical_integrators::IntegratorSettings< TimeType > > integratorSettings =
             propagatorSettings->getIntegratorSettings( );
 
+//     // Turn off dissipation
+//     for ( auto torque : dissipativeTorques )
+//     {
+//         torque->setDampingMatrixFunction( Eigen::Matrix3d::Zero( ) );
+//     }
+// //     dissipativeTorque->setDampingMatrixFunction( Eigen::Matrix3d::Zero( ) );    
+
     // Integrate forward with dissipation and retrieve results
     dynamicsSimulator->integrateEquationsOfMotion( initialState );
     std::map< TimeType, Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 > > forwardIntegrated =
             dynamicsSimulator->getEquationsOfMotionNumericalSolution( );
     std::map< TimeType, Eigen::Matrix< double, Eigen::Dynamic, 1 > > forwardIntegratedDependent =
             dynamicsSimulator->getDependentVariableHistory( );
+
+    std::cout << "number steps forward " << forwardIntegrated.size( ) << std::endl;
 
     // Save original integration/propagation settings
     TimeType originalStartTime = dynamicsSimulator->getInitialPropagationTime( );
@@ -79,24 +95,40 @@ void integrateForwardWithDissipationAndBackwardsWithout(
     double originalTimeStep = integratorSettings->initialTimeStep_;
 
     // Turn off dissipation
-    dissipativeTorque->setDampingMatrixFunction( Eigen::Matrix3d::Zero( ) );
+    for ( auto torque : dissipativeTorques )
+    {
+        torque->setDampingMatrixFunction( Eigen::Matrix3d::Zero( ) );
+    }
+//     dissipativeTorque->setDampingMatrixFunction( Eigen::Matrix3d::Zero( ) );
 
     // Reset propagation/integration settings for backwards propagation
     auto outputMapIterator = forwardIntegrated.rbegin( );
     dynamicsSimulator->resetInitialPropagationTime( outputMapIterator->first );
     propagatorSettings->resetTerminationSettings( std::make_shared< PropagationTimeTerminationSettings >( originalStartTime ) );
+//     propagatorSettings->resetTerminationSettings(
+        // std::make_shared< PropagationTimeTerminationSettings >( 
+                // ( originalStartTime + originalEndTime ) / 2.0 /*originalStartTime*/ ) );
     integratorSettings->initialTimeStep_ = -originalTimeStep;
 
-    // Integrate backward without dissipation and retrieve results
-    dynamicsSimulator->integrateEquationsOfMotion( outputMapIterator->second );
-    std::map< TimeType, Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 > > backwardIntegrated =
-            dynamicsSimulator->getEquationsOfMotionNumericalSolution( );
-    std::map< TimeType, Eigen::Matrix< double, Eigen::Dynamic, 1 > > backwardIntegratedDependent =
-            dynamicsSimulator->getDependentVariableHistory( );
+//     // Integrate backward without dissipation and retrieve results
+//     dynamicsSimulator->integrateEquationsOfMotion(
+//                 outputMapIterator->second );
+//     std::map< TimeType, Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1> > backwardIntegrated =
+//             dynamicsSimulator->getEquationsOfMotionNumericalSolution( );
+//     std::map< TimeType, Eigen::Matrix< double, Eigen::Dynamic, 1 > > backwardIntegratedDependent =
+//             dynamicsSimulator->getDependentVariableHistory( );
+    // TO AVOID BACKWARD PROPAGATION (AND COMMENT LINES 114 TO 120)
+    std::map< TimeType, Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1> > backwardIntegrated;
+    std::map< TimeType, Eigen::Matrix< double, Eigen::Dynamic, 1 > > backwardIntegratedDependent;
+
+    std::cout << "number steps backward " << backwardIntegrated.size( ) << std::endl;
 
     // Reset original integration/propagation settings
     dynamicsSimulator->resetInitialPropagationTime( originalStartTime );
     propagatorSettings->resetTerminationSettings( std::make_shared< PropagationTimeTerminationSettings >( originalEndTime ) );
+//     dynamicsSimulator->resetInitialPropagationTime( ( originalStartTime + originalEndTime ) / 2.0 /*originalStartTime*/ );
+//     propagatorSettings->resetTerminationSettings(
+                // std::make_shared< PropagationTimeTerminationSettings >( originalEndTime + ( originalEndTime - originalStartTime ) / 2.0 ) );
     integratorSettings->initialTimeStep_ = originalTimeStep;
 
     // Save states and dependent variables for both forward and backward integration
@@ -130,7 +162,7 @@ template< typename TimeType, typename StateScalarType >
 Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 > getZeroProperModeRotationalState(
         const simulation_setup::SystemOfBodies& bodies,
         const std::shared_ptr< SingleArcPropagatorSettings< StateScalarType, TimeType > > propagatorSettings,
-        const double bodyMeanRotationRate,
+        std::map< std::string, double > bodyMeanRotationRate,
         const std::vector< double > dissipationTimes,
         std::vector< std::pair< std::map< TimeType, Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 > >,
                                 std::map< TimeType, Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 > > > >& propagatedStates,
@@ -181,24 +213,39 @@ Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 > getZeroProperModeRotationalS
     }
 
     TimeType originalInitialTime = rotationPropagationSettings_->getInitialTime( );
+    TimeType originalEndTime = std::dynamic_pointer_cast< PropagationTimeTerminationSettings >(
+                propagatorSettings->getTerminationSettings( ) )->terminationTime_;
 
     // Get torque map
     torqueModelMap = rotationPropagationSettings_->getTorqueModelsMap( );
-    if( torqueModelMap.size( ) != 1 )
-    {
-        std::cerr << "Error when finding initial rotational state, " << torqueModelMap.size( ) << " bodies are propagated." << std::endl;
-    }
+//    if( torqueModelMap.size( ) != 1 )
+//     {
+//         std::cerr<<"Error when finding initial rotational state, "<<torqueModelMap.size( )<<" bodies are propagated."<<std::endl;
+//     }
 
-    // Retrieve body inertia tensor and create synthetic dissipation model
-    Eigen::Matrix3d inertiaTensor = bodies.at( torqueModelMap.begin( )->first )->getBodyInertiaTensor( );
-    std::shared_ptr< basic_astrodynamics::DissipativeTorqueModel > dissipativeTorque =
+    std::vector< std::shared_ptr< basic_astrodynamics::DissipativeTorqueModel > > dissipativeTorques; 
+    std::vector< Eigen::Matrix3d > inertiaTensors;   
+    std::vector< std::function< Eigen::Matrix3d( ) > >  inertiaTensorFunctions;
+    for ( auto bodyIt : torqueModelMap )
+    {
+         //Retrieve body inertia tensor and create synthetic dissipation model
+        Eigen::Matrix3d inertiaTensor = bodies.at( bodyIt.first )->getBodyInertiaTensor( );
+        std::shared_ptr< basic_astrodynamics::DissipativeTorqueModel > dissipativeTorque =
             std::make_shared< basic_astrodynamics::DissipativeTorqueModel >(
                     std::bind( &simulation_setup::Body::getCurrentAngularVelocityVectorInLocalFrame,
-                               bodies.at( torqueModelMap.begin( )->first ) ),
-                    [ = ]( ) { return Eigen::Matrix3d::Zero( ); },
-                    bodyMeanRotationRate );
-    torqueModelMap[ torqueModelMap.begin( )->first ][ torqueModelMap.begin( )->first ].push_back( dissipativeTorque );
+                               bodies.at( bodyIt.first ) ), [ = ]( ){ return Eigen::Matrix3d::Zero( ); }, bodyMeanRotationRate.at( bodyIt.first ) );
+        torqueModelMap[ bodyIt.first ][ bodyIt.first ].push_back(dissipativeTorque);
+        dissipativeTorques.push_back(dissipativeTorque);
+        inertiaTensors.push_back(inertiaTensor);
+
+        inertiaTensorFunctions.push_back( std::bind( &simulation_setup::Body::getBodyInertiaTensor,
+                           bodies.at( bodyIt.first ) ) );
+    }
     rotationPropagationSettings_->resetTorqueModelsMap( torqueModelMap );
+
+//     std::vector< std::shared_ptr< SingleDependentVariableSaveSettings > > dependentVariablesToSave = propagatorSettings->getDependentVariablesToSave();
+//     dependentVariablesToSave.push_back( singleTorqueVariable( basic_astrodynamics::dissipative_torque, "Moon", "Moon" ) );
+//     propagatorSettings->resetDependentVariablesToSave( dependentVariablesToSave );
 
     // Create object to propagate dynamics
     std::shared_ptr< SingleArcDynamicsSimulator< StateScalarType, TimeType > > dynamicsSimulator =
@@ -208,7 +255,7 @@ Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 > getZeroProperModeRotationalS
     if( propagateNominal )
     {
         integrateForwardWithDissipationAndBackwardsWithout< StateScalarType, TimeType >(
-                dynamicsSimulator, dissipativeTorque, propagatedStates.at( 0 ), dependentVariables.at( 0 ) );
+                dynamicsSimulator, dissipativeTorques, propagatedStates.at( 0 ), dependentVariables.at( 0 ) );
 
         // Write data to files if required
         int i = 0;
@@ -237,8 +284,19 @@ Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 > getZeroProperModeRotationalS
     double newFinalTime;
     for( unsigned int i = 0; i < dissipationTimes.size( ); i++ )
     {
-        // Set damping for current iteration
-        dissipativeTorque->setDampingMatrixFunction( getDissipationMatrix( dissipationTimes.at( i ), inertiaTensor ) );
+        // originalInitialTime = propagatorSettings->getInitialTime( );
+
+        for ( unsigned k = 0 ; k < dissipativeTorques.size( ) ; k++ )
+        {
+                // dissipativeTorques[ k ]->setDampingMatrixFunction(
+                //     getDissipationMatrix( dissipationTimes.at( i ), inertiaTensors[ k ] ) );
+
+                std::function< Eigen::Matrix3d( ) > dampingMatrixFunction = std::bind( 
+                        &getDissipationMatrix2, dissipationTimes.at( i ), inertiaTensorFunctions[ k ] );   
+                dissipativeTorques[ k ]->setDampingMatrixFunction( dampingMatrixFunction ); 
+        }
+        // dissipativeTorque->setDampingMatrixFunction(
+                //     getDissipationMatrix( dissipationTimes.at( i ), inertiaTensor ) );
 
         // Reset final time (propagate for 10 times the dissipation time)
         newFinalTime = originalInitialTime + 10.0 * dissipationTimes.at( i );
@@ -246,12 +304,13 @@ Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 > getZeroProperModeRotationalS
 
         // Propagate forward (with dissipation) and backward (without dissipation)
         integrateForwardWithDissipationAndBackwardsWithout< StateScalarType, TimeType >(
-                dynamicsSimulator, dissipativeTorque, propagatedStates.at( i + 1 ), dependentVariables.at( i + 1 ) );
+                dynamicsSimulator, dissipativeTorques, propagatedStates.at( i + 1 ), dependentVariables.at( i + 1 ) );
 
-        // Update initial state to current damped result
-        currentInitialState = propagatedStates.at( i + 1 ).second.begin( )->second;
-        propagatorSettings->resetInitialStates( currentInitialState );
-        propagatorSettings->resetInitialTime( originalInitialTime );
+        // // Update initial state to current damped result
+        // currentInitialState = propagatedStates.at( i + 1 ).second.begin( )->second;
+        // propagatorSettings->resetInitialStates( currentInitialState );
+        // propagatorSettings->resetInitialTime( originalInitialTime );
+        // // TO AVOID BACKWARD PROPAGATION, COMMENT LINES 321 TO 325
 
         // Write data to files if required
         if( writeToFileInLoop )
@@ -276,6 +335,9 @@ Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 > getZeroProperModeRotationalS
         }
     }
 
+    propagatorSettings->resetTerminationSettings(
+                std::make_shared< PropagationTimeTerminationSettings >( originalEndTime ) );
+
     // Return damped initial state that is computed
     return currentInitialState;
 }
@@ -299,7 +361,7 @@ std::tuple< Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 >,
                                     std::map< TimeType, Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 > > > > >
 getZeroProperModeRotationalState( const simulation_setup::SystemOfBodies& bodies,
                                   const std::shared_ptr< SingleArcPropagatorSettings< StateScalarType, TimeType > > propagatorSettings,
-                                  const double bodyMeanRotationRate,
+                                  std::map< std::string, double > bodyMeanRotationRate,
                                   const std::vector< double > dissipationTimes,
                                   const bool propagateNominal = true )
 {
@@ -310,14 +372,10 @@ getZeroProperModeRotationalState( const simulation_setup::SystemOfBodies& bodies
                             std::map< TimeType, Eigen::Matrix< double, Eigen::Dynamic, 1 > > > >
             dependentVariables;
 
-    Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 > initialState = getZeroProperModeRotationalState( bodies,
-                                                                                                         propagatorSettings,
-                                                                                                         bodyMeanRotationRate,
-                                                                                                         dissipationTimes,
-                                                                                                         propagatedStates,
-                                                                                                         dependentVariables,
-                                                                                                         propagateNominal,
-                                                                                                         false );
+    Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 > initialState = 
+        getZeroProperModeRotationalState< TimeType, StateScalarType >( bodies,
+                 propagatorSettings, bodyMeanRotationRate, dissipationTimes, propagatedStates,
+                 dependentVariables, propagateNominal, false );
 
     return std::make_tuple( initialState, propagatedStates, dependentVariables );
 }
@@ -326,7 +384,7 @@ template< typename TimeType = double, typename StateScalarType = double >
 std::shared_ptr< DampedInitialRotationalStateResults< TimeType, StateScalarType > > getZeroProperModeRotationalStateWithStruct(
         const simulation_setup::SystemOfBodies& bodies,
         const std::shared_ptr< SingleArcPropagatorSettings< StateScalarType, TimeType > > propagatorSettings,
-        const double bodyMeanRotationRate,
+        std::map< std::string, double > bodyMeanRotationRate,
         const std::vector< double > dissipationTimes,
         const bool propagateNominal = true )
 {
@@ -337,14 +395,9 @@ std::shared_ptr< DampedInitialRotationalStateResults< TimeType, StateScalarType 
                             std::map< TimeType, Eigen::Matrix< double, Eigen::Dynamic, 1 > > > >
             dependentVariables;
 
-    Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 > initialState = getZeroProperModeRotationalState( bodies,
-                                                                                                         propagatorSettings,
-                                                                                                         bodyMeanRotationRate,
-                                                                                                         dissipationTimes,
-                                                                                                         propagatedStates,
-                                                                                                         dependentVariables,
-                                                                                                         propagateNominal,
-                                                                                                         false );
+    Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 > initialState = 
+        getZeroProperModeRotationalState< TimeType, StateScalarType >( bodies, propagatorSettings,
+                bodyMeanRotationRate, dissipationTimes, propagatedStates, dependentVariables, propagateNominal, false );
     std::shared_ptr< DampedInitialRotationalStateResults< TimeType, StateScalarType > > resultsStruct =
             std::make_shared< DampedInitialRotationalStateResults< TimeType, StateScalarType > >( );
     resultsStruct->initialState_ = initialState;
@@ -371,7 +424,7 @@ template< typename TimeType = double, typename StateScalarType = double >
 Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 > getZeroProperModeRotationalState(
         const simulation_setup::SystemOfBodies& bodies,
         const std::shared_ptr< SingleArcPropagatorSettings< StateScalarType, TimeType > > propagatorSettings,
-        const double bodyMeanRotationRate,
+        std::map< std::string, double > bodyMeanRotationRate,
         const std::vector< double > dissipationTimes )
 // const bool propagateNominal = true )
 {
@@ -381,7 +434,7 @@ Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 > getZeroProperModeRotationalS
     std::vector< std::pair< std::map< TimeType, Eigen::Matrix< double, Eigen::Dynamic, 1 > >,
                             std::map< TimeType, Eigen::Matrix< double, Eigen::Dynamic, 1 > > > >
             dependentVariables;
-    return getZeroProperModeRotationalState( bodies,
+    return getZeroProperModeRotationalState< TimeType, StateScalarType >( bodies,
                                              propagatorSettings,
                                              bodyMeanRotationRate,
                                              dissipationTimes,

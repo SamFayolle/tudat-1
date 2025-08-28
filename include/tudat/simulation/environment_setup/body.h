@@ -46,6 +46,7 @@
 #include "tudat/astro/system_models/vehicleSystems.h"
 #include "tudat/basics/basicTypedefs.h"
 #include "tudat/math/basic/numericalDerivative.h"
+#include "tudat/math/basic/rotationRepresentations.h"
 
 namespace tudat
 {
@@ -211,8 +212,13 @@ class RigidBodyProperties
 public:
     RigidBodyProperties( ):
         currentMass_( TUDAT_NAN ), currentCenterOfMass_( Eigen::Vector3d::Constant( TUDAT_NAN ) ),
-        currentInertiaTensor_( Eigen::Matrix3d::Constant( TUDAT_NAN ) ), isBodyInPropagation_( false ), isMassComputed_( false ),
-        isComComputed_( false ), isInertiaTensorComputed_( false )
+        currentInertiaTensor_( Eigen::Matrix3d::Constant( TUDAT_NAN ) ),
+        currentDerivativeInertiaTensor_(Eigen::Matrix3d::Zero()),
+        isBodyInPropagation_( false ), 
+        isMassComputed_( false ),
+        isComComputed_( false ), 
+        isInertiaTensorComputed_( false ),
+        isDerivativeInertiaTensorComputed_( true )
     { }
 
     virtual ~RigidBodyProperties( ) { }
@@ -227,11 +233,16 @@ public:
 
     virtual void updateMassDistribution( const double currentTime ) = 0;
 
+    virtual void updateInertiaTensorDerivative( 
+        const Eigen::Vector5d& derivativeDegreeTwoCoefficients ){ };
+
     virtual void resetCurrentTime( )
     {
         isMassComputed_ = false;
         isComComputed_ = false;
         isInertiaTensorComputed_ = false;
+        isDerivativeInertiaTensorComputed_ = true;
+        // currentDerivativeInertiaTensor_ = Eigen::Matrix3d::Zero( );
     }
 
     double getCurrentMass( )
@@ -261,6 +272,15 @@ public:
         return currentInertiaTensor_;
     }
 
+    Eigen::Matrix3d getCurrentDerivativeInertiaTensor( )
+    {
+        if ( !isDerivativeInertiaTensorComputed_ )
+        {
+            throw std::runtime_error( "Error when retrieving derivative of the inertia tensor, not computed/defined." );
+        }
+        return currentDerivativeInertiaTensor_;
+    }
+
     virtual void setCurrentMass( const double currentMass ) = 0;
 
     virtual void setIsBodyInPropagation( const bool isBodyInPropagation )
@@ -275,6 +295,8 @@ protected:
 
     Eigen::Matrix3d currentInertiaTensor_;
 
+    Eigen::Matrix3d currentDerivativeInertiaTensor_;
+
     bool isBodyInPropagation_;
 
     bool isMassComputed_;
@@ -282,6 +304,8 @@ protected:
     bool isComComputed_;
 
     bool isInertiaTensorComputed_;
+
+    bool isDerivativeInertiaTensorComputed_;
 };
 
 class TimeDependentRigidBodyProperties : public RigidBodyProperties
@@ -440,6 +464,7 @@ public:
         currentMass_ = gravityFieldModel_->getGravitationalParameter( ) / physical_constants::GRAVITATIONAL_CONSTANT;
         currentCenterOfMass_ = gravityFieldModel_->getCenterOfMass( );
         currentInertiaTensor_ = gravityFieldModel_->getInertiaTensor( );
+        currentDerivativeInertiaTensor_ = Eigen::Matrix3d::Zero( );
 
         isMassComputed_ = true;
         isComComputed_ = true;
@@ -451,7 +476,7 @@ public:
         }
         else
         {
-            modelIsTimeDependent_ = false;
+            modelIsTimeDependent_ = true;
         }
     }
 
@@ -464,6 +489,8 @@ public:
             isMassComputed_ = false;
             isComComputed_ = false;
             isInertiaTensorComputed_ = false;
+            isDerivativeInertiaTensorComputed_ = true;
+            // currentDerivativeInertiaTensor_ = Eigen::Matrix3d::Zero( );
         }
     }
 
@@ -485,6 +512,16 @@ public:
             isComComputed_ = true;
             isInertiaTensorComputed_ = true;
         }
+    }
+
+    void updateInertiaTensorDerivative( 
+        const Eigen::Vector5d& derivativeDegreeTwoCoefficients )
+    {
+        gravityFieldModel_->resetDerivativeInertiaTensor(
+            derivativeDegreeTwoCoefficients[ 0 ], derivativeDegreeTwoCoefficients[ 1 ], derivativeDegreeTwoCoefficients[ 2 ],
+            derivativeDegreeTwoCoefficients[ 3 ], derivativeDegreeTwoCoefficients[ 4 ] );
+        currentDerivativeInertiaTensor_ = gravityFieldModel_->getDerivativeInertiaTensor( ); 
+        isDerivativeInertiaTensorComputed_ = true;
     }
 
     virtual void setCurrentMass( const double currentMass )
@@ -535,11 +572,16 @@ public:
         currentRotationToGlobalFrame_( Eigen::Quaterniond( Eigen::Matrix3d::Identity( ) ) ),
         currentRotationToLocalFrameDerivative_( Eigen::Matrix3d::Zero( ) ),
         currentAngularVelocityVectorInGlobalFrame_( Eigen::Vector3d::Zero( ) ),
-        currentAngularVelocityVectorInLocalFrame_( Eigen::Vector3d::Zero( ) ), bodyName_( "unnamed_body" )
+        currentAngularVelocityVectorInLocalFrame_( Eigen::Vector3d::Zero( ) ),
+        currentAngularVelocityDerivativeVectorInLocalFrame_( Eigen::Vector3d( ) ),
+        bodyName_( "unnamed_body" )
     {
         currentLongState_ = currentState_.cast< long double >( );
         isStateSet_ = false;
         isRotationSet_ = false;
+
+        // TO BE MODIFIED
+        staticDegreeTwoCoefficients_ = Eigen::VectorXd::Zero( 3 );
     }
 
     //! Function to retrieve the class returning the state of this body's ephemeris origin w.r.t. the global origin
@@ -578,6 +620,8 @@ public:
             return currentState_;
         }
     }
+
+    void getStateByReference( Eigen::Vector6d& state ) { state = currentState_; }
 
     //! Set current state of body manually
     /*!
@@ -928,10 +972,11 @@ public:
 
         currentAngularVelocityVectorInLocalFrame_ = currentRotationalStateFromLocalToGlobalFrame.block< 3, 1 >( 4, 0 );
 
-        Eigen::Matrix3d currentRotationMatrixToLocalFrame = ( currentRotationToLocalFrame_ ).toRotationMatrix( );
-        currentRotationToLocalFrameDerivative_ =
-                linear_algebra::getCrossProductMatrix( currentRotationalStateFromLocalToGlobalFrame.block< 3, 1 >( 4, 0 ) ) *
-                currentRotationMatrixToLocalFrame;
+        Eigen::Matrix3d currentRotationMatrixToLocalFrame = ( currentRotationToLocalFrame_ ).toRotationMatrix();
+        currentRotationToLocalFrameDerivative_ = - currentRotationMatrixToLocalFrame * 
+        linear_algebra::getCrossProductMatrix( currentAngularVelocityVectorInGlobalFrame_ );
+    //  linear_algebra::getCrossProductMatrix( currentAngularVelocityVectorInLocalFrame_ ) * currentRotationMatrixToLocalFrame;
+
         isRotationSet_ = true;
     }
 
@@ -1014,6 +1059,22 @@ public:
         {
             return Eigen::Matrix3d( currentRotationToLocalFrame_ );
         }
+    }
+
+    //! Templated function to get the current state of the body from its ephemeris and
+    //! global-to-ephemeris-frame function.
+    /*!
+     * Templated function to get the current state of the body from its ephemeris and
+     * global-to-ephemeris-frame function.  It calls the setStateFromEphemeris state, resetting the currentState_ /
+     * currentLongState_ variables, and returning the state with the requested precision
+     * \param time Time at which to evaluate states.
+     * \return State at requested time
+     */
+    template<typename TimeType = double>
+    Eigen::Quaterniond getRotationToBaseFrameFromEphemeris( const TimeType time )
+    {
+        setCurrentRotationalStateToLocalFrameFromEphemeris< TimeType >( time );
+        return currentRotationToGlobalFrame_;
     }
 
     //! Get current rotational state.
@@ -1124,6 +1185,30 @@ public:
         {
             return currentAngularVelocityVectorInLocalFrame_;
         }
+    }
+
+    //! Get current angular velocity derivative vector for body's rotation, expressed in the local frame.
+    /*!
+     *  Get current angular velocity derivative vector for body's rotation, expressed in the local frame.
+     *  \return Current angular velocity derivative vector for body's rotation, expressed in the local frame.
+     */
+    Eigen::Vector3d getCurrentAngularVelocityDerivativeVectorInLocalFrame( )
+    {
+        // if( !isRotationSet_ )
+        // {
+        //     throw std::runtime_error( "Error when retrieving angular velocioty of body " + bodyName_ + ", state of body is not yet defined" );
+        // }
+        // else
+        // {
+            return currentAngularVelocityDerivativeVectorInLocalFrame_;
+        // }
+    }
+
+    void setCurrentAngularVelocityDerivativeVectorInLocalFrame( const Eigen::Vector3d& angularVelocityDerivativeVector )
+    {
+        currentAngularVelocityDerivativeVectorInLocalFrame_ = angularVelocityDerivativeVector;
+        // std::cout << "currentAngularVelocityDerivativeVectorInLocalFrame_ " << 
+            // currentAngularVelocityDerivativeVectorInLocalFrame_.transpose( ) << std::endl;
     }
 
     //! Function to set the ephemeris of the body.
@@ -1308,6 +1393,55 @@ public:
     void setGravityFieldVariationSet( const std::shared_ptr< gravitation::GravityFieldVariationsSet > gravityFieldVariationSet )
     {
         gravityFieldVariationSet_ = gravityFieldVariationSet;
+    }
+
+    void setCurrentPropagatedGravityField(const Eigen::VectorXd gravityCoefficients )
+    {
+        double C20 = gravityCoefficients[ 0 ];
+        double C22 = gravityCoefficients[ 1 ];
+        double S22 = gravityCoefficients[ 2 ];
+
+        // Tranform to **normalised** coefficients
+        C20 *= ( 1.0 / basic_mathematics::calculateLegendreGeodesyNormalizationFactor( 2, 0 ) );
+        C22 *= ( 1.0 / basic_mathematics::calculateLegendreGeodesyNormalizationFactor( 2, 2 ) );
+        S22 *= ( 1.0 / basic_mathematics::calculateLegendreGeodesyNormalizationFactor( 2, 2 ) );
+
+        // Add static field contribution (normalised)
+        C20 += staticDegreeTwoCoefficients_[ 0 ];
+        C22 += staticDegreeTwoCoefficients_[ 1 ];
+        S22 += staticDegreeTwoCoefficients_[ 2 ];
+
+        // if( gravityFieldModel_ == nullptr )
+        // {
+        //     gravityFieldModel_ = std::make_shared< SphericalHarmonicsGravityField >( const double gravitationalParameter,
+        //     const double referenceRadius,
+        //     const Eigen::MatrixXd& cosineCoefficients = Eigen::MatrixXd::Identity( 1, 1 ),
+        //     const Eigen::MatrixXd& sineCoefficients = Eigen::MatrixXd::Zero( 1, 1 ) );
+        // }
+        // else
+        // {
+            // ADD WARNING!
+            std::shared_ptr< gravitation::SphericalHarmonicsGravityField > sphericalHarmonicsModel = 
+                std::dynamic_pointer_cast< gravitation::SphericalHarmonicsGravityField >( gravityFieldModel_ );
+            if ( sphericalHarmonicsModel == nullptr )
+            {
+                throw std::runtime_error( "Error when setting current propagated gravity field, should be a "
+                    " spherical harmonics expansion model" );
+            }
+            Eigen::MatrixXd cosineCoefficients = sphericalHarmonicsModel->getCosineCoefficients( );
+            Eigen::MatrixXd sineCoefficients = sphericalHarmonicsModel->getSineCoefficients( );
+            cosineCoefficients( 2, 0 ) = C20;
+            cosineCoefficients( 2, 2 ) = C22;
+            sineCoefficients( 2, 2 ) = S22;
+            sphericalHarmonicsModel->setCosineCoefficients( cosineCoefficients );
+            sphericalHarmonicsModel->setSineCoefficients( sineCoefficients );
+
+        // }
+    }
+
+    void setStaticDegreeTwoCoefficients( Eigen::VectorXd staticDegreeTwoCoefficients )
+    {
+        staticDegreeTwoCoefficients_ = staticDegreeTwoCoefficients;
     }
 
     //! Function to get the gravity field model of the body.
@@ -1648,6 +1782,21 @@ public:
         return massProperties_->getCurrentInertiaTensor( );
     }
 
+    //! Function to retrieve the body moment-of-inertia tensor derivative.
+    /*!
+     * Function to retrieve the body moment-of-inertia tensor derivative.
+     * \return  Body moment-of-inertia tensor derivative.
+     */
+    Eigen::Matrix3d getBodyInertiaTensorDerivative( )
+    {
+        if( massProperties_ == nullptr )
+        {
+            throw std::runtime_error( "Error when retrieving the time derivative of the inertia tensor of " + bodyName_ 
+            + ",  no mass properties found" );
+        }
+        return massProperties_->getCurrentDerivativeInertiaTensor( );
+    }
+
     //! Function to (re)set the body moment-of-inertia tensor.
     /*!
      * Function to (re)set the body moment-of-inertia tensor.
@@ -1828,6 +1977,9 @@ private:
     //! Current angular velocity vector for body's rotation, expressed in the body-fixed frame.
     Eigen::Vector3d currentAngularVelocityVectorInLocalFrame_;
 
+    //! Current angular velocity vector for body's rotation, expressed in the body-fixed frame.
+    Eigen::Vector3d currentAngularVelocityDerivativeVectorInLocalFrame_;
+
     //    //! Mass of body (default set to zero, calculated from GravityFieldModel when it is set).
     //    double currentMass_;
 
@@ -1894,6 +2046,9 @@ private:
     bool isStateSet_;
 
     bool isRotationSet_;
+
+    // TO BE MODIFIED
+    Eigen::VectorXd staticDegreeTwoCoefficients_;
 
     std::shared_ptr< environment::IonosphereModel > ionosphereModel_;
 };

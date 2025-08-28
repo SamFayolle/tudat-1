@@ -27,7 +27,13 @@ namespace propagators
 // Enum listing types of dynamics that can be numerically integrated
 // ! @get_docstring(IntegratedStateType.__docstring__)
 
-enum IntegratedStateType { hybrid = 0, translational_state = 1, rotational_state = 2, body_mass_state = 3, custom_state = 4 };
+enum IntegratedStateType { 
+    hybrid = 0, 
+    translational_state = 1, 
+    rotational_state = 2, 
+    body_mass_state = 3, 
+    custom_state = 4,
+    gravity_deformation_state = 5 };
 
 std::string getIntegratedStateTypString( const IntegratedStateType stateType );
 
@@ -74,7 +80,9 @@ public:
      * Constructor.
      * \param integratedStateType Type of dynamics for whichh the state derivative is calculated.
      */
-    SingleStateTypeDerivative( const IntegratedStateType integratedStateType ): integratedStateType_( integratedStateType )
+    SingleStateTypeDerivative( const IntegratedStateType integratedStateType,
+                               const std::vector< std::string >& bodiesToIntegrate = std::vector< std::string >( ) ):
+        integratedStateType_( integratedStateType ), bodiesToIntegrate_( bodiesToIntegrate )
     {
         if( isStateToBePostProcessed( ) )
         {
@@ -227,12 +235,19 @@ public:
         return false;
     }
 
+    virtual std::vector< std::string > getBodiesToIntegrate( )
+    {
+        return bodiesToIntegrate_;
+    }
+
 protected:
     // Type of dynamics for which the state derivative is calculated.
     IntegratedStateType integratedStateType_;
 
     // Vector used during post-processing of state.
     Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 > unprocessedState_;
+
+    std::vector< std::string > bodiesToIntegrate_;
 };
 
 // extern template class SingleStateTypeDerivative< double, double >;

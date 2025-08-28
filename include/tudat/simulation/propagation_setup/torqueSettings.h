@@ -121,7 +121,7 @@ inline std::shared_ptr< TorqueSettings > sphericalHarmonicGravitationalTorque( c
     return std::make_shared< SphericalHarmonicTorqueSettings >( maximumDegree, maximumOrder );
 }
 
-inline std::shared_ptr< TorqueSettings > dissipativeTorque( const int maximumDegree, const int maximumOrder )
+inline std::shared_ptr< TorqueSettings > dissipativeTorque( )
 {
     return std::make_shared< TorqueSettings >( basic_astrodynamics::dissipative_torque );
 }

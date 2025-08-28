@@ -35,6 +35,9 @@ std::string getIntegratedStateTypString( const IntegratedStateType stateType )
         case hybrid:
             stateTypeString = "Multi-type state";
             break;
+        case gravity_deformation_state:
+            stateTypeString = "Gravity state";
+            break;
         default:
             std::string errorMessage = "Did not recognize state type " + std::to_string( stateType ) + "when getting string";
             throw std::runtime_error( errorMessage );
@@ -61,6 +64,9 @@ int getSingleIntegrationSize( const IntegratedStateType stateType )
             singleStateSize = 0;
             std::cerr << "Warning when requesting state size of custom state, size is unknown. Returning value of 0" << std::endl;
             break;
+        case gravity_deformation_state:
+            singleStateSize = 3;
+            break;
         default:
             std::string errorMessage = "Did not recognize state type " + std::to_string( stateType ) + "when getting size";
             throw std::runtime_error( errorMessage );
@@ -83,6 +89,9 @@ int getSingleIntegrationDifferentialEquationOrder( const IntegratedStateType sta
         case rotational_state:
             singleStateSize = 1;
             break;
+        case gravity_deformation_state:
+            singleStateSize = 1;
+            break;
         default:
             std::string errorMessage = "Did not recognize state type " + std::to_string( stateType ) + "when getting order";
             throw std::runtime_error( errorMessage );
@@ -103,6 +112,9 @@ int getGeneralizedAccelerationSize( const IntegratedStateType stateType )
             accelerationSize = 1;
             break;
         case rotational_state:
+            accelerationSize = 3;
+            break;
+        case gravity_deformation_state:
             accelerationSize = 3;
             break;
         default:

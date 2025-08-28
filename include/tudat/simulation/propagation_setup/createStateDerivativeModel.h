@@ -33,6 +33,7 @@
 #include "tudat/astro/propagators/stateDerivativeCircularRestrictedThreeBodyProblem.h"
 #include "tudat/simulation/environment_setup/body.h"
 #include "tudat/math/integrators/createNumericalIntegrator.h"
+#include "tudat/astro/propagators/gravityDerivative.h"
 
 namespace tudat
 {
@@ -290,6 +291,14 @@ std::shared_ptr< SingleStateTypeDerivative< StateScalarType, TimeType > > create
                                                        bodies.at( rotationPropagatorSettings->bodiesToIntegrate_.at( i ) ) ) );
     }
 
+    std::vector< std::function< Eigen::Matrix3d( ) > > momentOfInertiaDerivativeFunctions;
+    for( unsigned int i = 0; i < rotationPropagatorSettings->bodiesToIntegrate_.size( ); i++ )
+    {
+        momentOfInertiaDerivativeFunctions.push_back(
+                    std::bind( &simulation_setup::Body::getBodyInertiaTensorDerivative,
+                               bodies.at( rotationPropagatorSettings->bodiesToIntegrate_.at( i ) ) ) );
+    }
+
     // Check propagator type and create corresponding state derivative object.
     std::shared_ptr< SingleStateTypeDerivative< StateScalarType, TimeType > > stateDerivativeModel;
     switch( rotationPropagatorSettings->propagator_ )
@@ -298,7 +307,7 @@ std::shared_ptr< SingleStateTypeDerivative< StateScalarType, TimeType > > create
             stateDerivativeModel = std::make_shared< RotationalMotionQuaternionsStateDerivative< StateScalarType, TimeType > >(
                     rotationPropagatorSettings->getTorqueModelsMap( ),
                     rotationPropagatorSettings->bodiesToIntegrate_,
-                    momentOfInertiaFunctions );
+                    momentOfInertiaFunctions, momentOfInertiaDerivativeFunctions );
             break;
         }
         case modified_rodrigues_parameters: {
@@ -306,14 +315,14 @@ std::shared_ptr< SingleStateTypeDerivative< StateScalarType, TimeType > > create
                     std::make_shared< RotationalMotionModifiedRodriguesParametersStateDerivative< StateScalarType, TimeType > >(
                             rotationPropagatorSettings->getTorqueModelsMap( ),
                             rotationPropagatorSettings->bodiesToIntegrate_,
-                            momentOfInertiaFunctions );
+                            momentOfInertiaFunctions, momentOfInertiaDerivativeFunctions );
             break;
         }
         case exponential_map: {
             stateDerivativeModel = std::make_shared< RotationalMotionExponentialMapStateDerivative< StateScalarType, TimeType > >(
                     rotationPropagatorSettings->getTorqueModelsMap( ),
                     rotationPropagatorSettings->bodiesToIntegrate_,
-                    momentOfInertiaFunctions );
+                    momentOfInertiaFunctions, momentOfInertiaDerivativeFunctions );
             break;
         }
         default:
@@ -339,6 +348,24 @@ std::shared_ptr< SingleStateTypeDerivative< StateScalarType, TimeType > > create
     return std::make_shared< propagators::BodyMassStateDerivative< StateScalarType, TimeType > >(
             massPropagatorSettings->getMassRateModelsMap( ), massPropagatorSettings->bodiesWithMassToPropagate_ );
 }
+
+//! Function to create a gravity state derivative model.
+/*!
+ *  Function to create a gravity state derivative model from propagation settings and environment.
+ *  \param massPropagatorSettings Settings for the mass dynamics model.
+ *  \param bodies List of body objects in the environment
+ *  \return Mass state derivative model.
+ */
+template< typename StateScalarType = double, typename TimeType = double >
+std::shared_ptr< SingleStateTypeDerivative< StateScalarType, TimeType > > createGravityStateDerivativeModel(
+        const std::shared_ptr< GravityDeformationPropagatorSettings< StateScalarType, TimeType > > gravityPropagatorSettings,
+        const  simulation_setup::SystemOfBodies& bodies )
+{
+    return std::make_shared< propagators::GravityStateDerivative< StateScalarType, TimeType > >(
+                gravityPropagatorSettings->getGravityDeformationModelsMap( ),
+                gravityPropagatorSettings->bodiesWithGravityToPropagate_ );
+}
+
 
 //! Function to create a state derivative model.
 /*!
@@ -415,6 +442,23 @@ std::shared_ptr< SingleStateTypeDerivative< StateScalarType, TimeType > > create
             {
                 stateDerivativeModel = std::make_shared< CustomStateDerivative< StateScalarType, TimeType > >(
                         customPropagatorSettings->stateDerivativeFunction_, customPropagatorSettings->stateSize_ );
+            }
+            break;
+        }
+        case gravity_deformation_state:
+        {
+            // Check input consistency.
+            std::shared_ptr< GravityDeformationPropagatorSettings< StateScalarType, TimeType > > gravityPropagatorSettings =
+                    std::dynamic_pointer_cast< GravityDeformationPropagatorSettings< StateScalarType, TimeType > >( propagatorSettings );
+            if( gravityPropagatorSettings == nullptr )
+            {
+                throw std::runtime_error(
+                            "Error, expected gravity propagation settings when making state derivative model" );
+            }
+            else
+            {
+                stateDerivativeModel = createGravityStateDerivativeModel< StateScalarType, TimeType >(
+                            gravityPropagatorSettings, bodies );
             }
             break;
         }

@@ -706,24 +706,27 @@ public:
         // Create object that calculates the complete state derivatives
         if( predefinedStateDerivativeModels.stateDerivativeModels_.size( ) == 0 )
         {
+            std::vector< std::shared_ptr< SingleStateTypeDerivative< StateScalarType, TimeType > > >
+            stateDerivativeModels = createStateDerivativeModels< StateScalarType, TimeType >(
+                            propagatorSettings_, bodies_, propagatorSettings_->getInitialTime( ) );
+            stateDerivativeUpdater_ = createStateDerivativeUpdaterForDynamicalEquations( propagatorSettings_, stateDerivativeModels, bodies );
+
             dynamicsStateDerivative_ = std::make_shared< DynamicsStateDerivativeModel< TimeType, StateScalarType > >(
-                    createStateDerivativeModels< StateScalarType, TimeType >(
-                            propagatorSettings_, bodies_, propagatorSettings_->getInitialTime( ) ),
+                    stateDerivativeModels /* createStateDerivativeModels< StateScalarType, TimeType >(
+                            propagatorSettings_, bodies_, propagatorSettings_->getInitialTime( ) ) */,
                     std::bind( &EnvironmentUpdater< StateScalarType, TimeType >::updateEnvironment,
-                               environmentUpdater_,
-                               std::placeholders::_1,
-                               std::placeholders::_2,
-                               std::placeholders::_3 ) );
+                               environmentUpdater_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3 ),
+                        std::shared_ptr< VariationalEquations >( ), stateDerivativeUpdater_ );
         }
         else
         {
+            stateDerivativeUpdater_ = createStateDerivativeUpdaterForDynamicalEquations( 
+                propagatorSettings_, predefinedStateDerivativeModels.stateDerivativeModels_, bodies );
             dynamicsStateDerivative_ = std::make_shared< DynamicsStateDerivativeModel< TimeType, StateScalarType > >(
                     predefinedStateDerivativeModels.stateDerivativeModels_,
                     std::bind( &EnvironmentUpdater< StateScalarType, TimeType >::updateEnvironment,
-                               environmentUpdater_,
-                               std::placeholders::_1,
-                               std::placeholders::_2,
-                               std::placeholders::_3 ) );
+                               environmentUpdater_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3 ),
+                    std::shared_ptr< VariationalEquations >( ), stateDerivativeUpdater_ );
         }
         stateDerivativeFunction_ = std::bind( &DynamicsStateDerivativeModel< TimeType, StateScalarType >::computeStateDerivative,
                                               dynamicsStateDerivative_,
@@ -1241,6 +1244,8 @@ protected:
      * function automatically updates all dependent variables that are needed to calulate the state derivative.
      */
     std::shared_ptr< EnvironmentUpdater< StateScalarType, TimeType > > environmentUpdater_;
+
+    std::shared_ptr< StateDerivativeUpdater< StateScalarType, TimeType > > stateDerivativeUpdater_;
 
     //! Interface object that updates current environment and returns state derivative from single function call.
     std::shared_ptr< DynamicsStateDerivativeModel< TimeType, StateScalarType > > dynamicsStateDerivative_;
