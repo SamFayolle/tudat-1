@@ -63,11 +63,12 @@ MaxwellDeformationSettings(
     const int maximumDegree,
     const int maximumOrder,
     const std::string perturbingBody,
-    const Eigen::VectorXd staticCoefficients = Eigen::VectorXd::Zero( 3 ) ):
+    const Eigen::VectorXd staticCoefficients = Eigen::VectorXd::Zero( 5 ),
+    const bool includeOrder1 = true ):
     GravityDeformationSettings( basic_astrodynamics::maxwell_deformation ), maxwellRelaxationTime_( maxwellRelaxationTime ),
     globalRelaxationTime_( globalRelaxationTime ), loveNumber_( loveNumber ), 
     maximumDegree_( maximumDegree ), maximumOrder_( maximumOrder ), perturbingBody_( perturbingBody ), 
-    staticCoefficients_( staticCoefficients )
+    staticCoefficients_( staticCoefficients ), includeOrder1_( includeOrder1 )
     {
 
     }
@@ -82,6 +83,7 @@ const int maximumDegree_;
 const int maximumOrder_;
 const std::string perturbingBody_;
 Eigen::VectorXd staticCoefficients_;
+const bool includeOrder1_;
 
 };
 
@@ -94,10 +96,11 @@ inline std::shared_ptr< GravityDeformationSettings > maxwellDeformationSettings(
     const int maximumDegree,
     const int maximumOrder,
     const std::string perturbingBody,
-    const Eigen::VectorXd staticCoefficients = Eigen::VectorXd::Zero( 3 ) )
+    const Eigen::VectorXd staticCoefficients = Eigen::VectorXd::Zero( 5 ),
+    const bool includeOrder1 = true )
 {
     return std::make_shared< MaxwellDeformationSettings >( maxwellRelaxationTime, globalRelaxationTime, loveNumber,
-        maximumDegree, maximumOrder, perturbingBody, staticCoefficients );
+        maximumDegree, maximumOrder, perturbingBody, staticCoefficients, includeOrder1 );
 }
 
 

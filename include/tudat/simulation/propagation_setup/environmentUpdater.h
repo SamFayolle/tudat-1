@@ -181,7 +181,7 @@ private:
                     {
                         bodyList_.at( std::get< 0 >( bodiesWithIntegratedGravity[ i ] ) )
                                 ->setCurrentPropagatedGravityField( 
-                                    integratedStateIterator_->second.segment( i * 3, 3 ).template cast< double >( ) );
+                                    integratedStateIterator_->second.segment( i * 5, 5 ).template cast< double >( ) );
                     }
                     break;
                 }
@@ -244,6 +244,7 @@ private:
                             integratedStates_.at( gravity_deformation_state );
                     for( unsigned int i = 0; i < bodiesWithIntegratedStates.size( ); i++ )
                     {
+                        // TO BE MODIFIED
                         bodyList_.at( std::get< 0 >( bodiesWithIntegratedStates[ i ] ) )->
                                 updateMass( currentTime );
 
@@ -990,14 +991,16 @@ public:
 
                 if ( dependencyTypeIt.first == inertia_tensor_derivative_dependency )
                 {
-                    Eigen::Vector3d currentGravityStateDerivative = 
+                    Eigen::Vector5d currentGravityStateDerivative = 
                         integratedStateDerivativesToSet2.block( indices.first, 0, indices.second, 1 );
                     // std::cout << "currentGravityStateDerivative " << currentGravityStateDerivative.transpose( ) << std::endl;
 
                     Eigen::Vector5d fullDegree2Derivative = Eigen::Vector5d::Zero( );
                     fullDegree2Derivative[ 0 ] = currentGravityStateDerivative[ 0 ];
-                    fullDegree2Derivative[ 2 ] = currentGravityStateDerivative[ 1 ];
-                    fullDegree2Derivative[ 4 ] = currentGravityStateDerivative[ 2 ];
+                    fullDegree2Derivative[ 1 ] = currentGravityStateDerivative[ 1 ];
+                    fullDegree2Derivative[ 2 ] = currentGravityStateDerivative[ 2 ];
+                    fullDegree2Derivative[ 3 ] = currentGravityStateDerivative[ 3 ];
+                    fullDegree2Derivative[ 4 ] = currentGravityStateDerivative[ 4 ];
 
                     dependencyTypeIt.second.at( i ).second( fullDegree2Derivative );
                 }

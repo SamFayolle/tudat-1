@@ -581,7 +581,7 @@ public:
         isRotationSet_ = false;
 
         // TO BE MODIFIED
-        staticDegreeTwoCoefficients_ = Eigen::VectorXd::Zero( 3 );
+        staticDegreeTwoCoefficients_ = Eigen::VectorXd::Zero( 5 );
     }
 
     //! Function to retrieve the class returning the state of this body's ephemeris origin w.r.t. the global origin
@@ -1397,19 +1397,26 @@ public:
 
     void setCurrentPropagatedGravityField(const Eigen::VectorXd gravityCoefficients )
     {
+
         double C20 = gravityCoefficients[ 0 ];
-        double C22 = gravityCoefficients[ 1 ];
-        double S22 = gravityCoefficients[ 2 ];
+        double C21 = gravityCoefficients[ 1 ];
+        double C22 = gravityCoefficients[ 2 ];
+        double S21 = gravityCoefficients[ 3 ];
+        double S22 = gravityCoefficients[ 4 ];
 
         // Tranform to **normalised** coefficients
         C20 *= ( 1.0 / basic_mathematics::calculateLegendreGeodesyNormalizationFactor( 2, 0 ) );
+        C21 *= ( 1.0 / basic_mathematics::calculateLegendreGeodesyNormalizationFactor( 2, 1 ) );
         C22 *= ( 1.0 / basic_mathematics::calculateLegendreGeodesyNormalizationFactor( 2, 2 ) );
+        S21 *= ( 1.0 / basic_mathematics::calculateLegendreGeodesyNormalizationFactor( 2, 1 ) );
         S22 *= ( 1.0 / basic_mathematics::calculateLegendreGeodesyNormalizationFactor( 2, 2 ) );
 
         // Add static field contribution (normalised)
         C20 += staticDegreeTwoCoefficients_[ 0 ];
-        C22 += staticDegreeTwoCoefficients_[ 1 ];
-        S22 += staticDegreeTwoCoefficients_[ 2 ];
+        C21 += staticDegreeTwoCoefficients_[ 1 ];
+        C22 += staticDegreeTwoCoefficients_[ 2 ];
+        S21 += staticDegreeTwoCoefficients_[ 3 ];
+        S22 += staticDegreeTwoCoefficients_[ 4 ];
 
         // if( gravityFieldModel_ == nullptr )
         // {
@@ -1431,7 +1438,9 @@ public:
             Eigen::MatrixXd cosineCoefficients = sphericalHarmonicsModel->getCosineCoefficients( );
             Eigen::MatrixXd sineCoefficients = sphericalHarmonicsModel->getSineCoefficients( );
             cosineCoefficients( 2, 0 ) = C20;
+            cosineCoefficients( 2, 1 ) = C21;
             cosineCoefficients( 2, 2 ) = C22;
+            sineCoefficients( 2, 1 ) = S21;
             sineCoefficients( 2, 2 ) = S22;
             sphericalHarmonicsModel->setCosineCoefficients( cosineCoefficients );
             sphericalHarmonicsModel->setSineCoefficients( sineCoefficients );

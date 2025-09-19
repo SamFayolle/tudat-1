@@ -1730,12 +1730,12 @@ private:
 
 void verifyInput( )
 {
-    if( this->initialStates_.rows( ) != static_cast< int >( 3 * bodiesWithGravityToPropagate_.size( ) ) )
+    if( this->initialStates_.rows( ) != static_cast< int >( 5 * bodiesWithGravityToPropagate_.size( ) ) )
     {
         throw std::runtime_error( "Error when defining body gravity deformation propagator settings, provided initial state size (" +
                                     std::to_string( this->initialStates_.rows( ) ) +
                                     ") is incompatible with list of bodies for which gravity deformation is to be propagated (size " +
-                                    std::to_string( 3 * bodiesWithGravityToPropagate_.size( ) ) + ")");
+                                    std::to_string( 5 * bodiesWithGravityToPropagate_.size( ) ) + ")");
     }
 }
 

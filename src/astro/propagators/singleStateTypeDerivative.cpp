@@ -65,7 +65,7 @@ int getSingleIntegrationSize( const IntegratedStateType stateType )
             std::cerr << "Warning when requesting state size of custom state, size is unknown. Returning value of 0" << std::endl;
             break;
         case gravity_deformation_state:
-            singleStateSize = 3;
+            singleStateSize = 5;
             break;
         default:
             std::string errorMessage = "Did not recognize state type " + std::to_string( stateType ) + "when getting size";
@@ -115,7 +115,7 @@ int getGeneralizedAccelerationSize( const IntegratedStateType stateType )
             accelerationSize = 3;
             break;
         case gravity_deformation_state:
-            accelerationSize = 3;
+            accelerationSize = 5;
             break;
         default:
             std::string errorMessage = "Did not recognize state type " + std::to_string( stateType ) + "when getting acceleration sizw";

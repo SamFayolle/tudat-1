@@ -24,9 +24,7 @@
 
 #include "tudat/math/basic/mathematicalConstants.h"
 #include "tudat/astro/basic_astro/accelerationModel.h"
-// #include "tudat/astro/gravitation/sphericalHarmonicsGravityModelBase.h"
 #include "tudat/math/basic/sphericalHarmonics.h"
-//#include "tudat/astro/gravitation/sphericalHarmonicsGravityField.h"
 #include "tudat/math/basic/coordinateConversions.h"
 
 namespace tudat
@@ -46,7 +44,7 @@ public:
     //! Constructor.
     GravityDeformationModel( ):
         currentTime_( TUDAT_NAN ),
-        currentDeformation_( Eigen::VectorXd::Zero( 3 ) ){ }
+        currentDeformation_( Eigen::VectorXd::Zero( 5 ) ){ }
 
     //! Virtual destructor.
     /*!
@@ -54,16 +52,6 @@ public:
      */
     virtual ~GravityDeformationModel( ) { }
 
-//    //! Get acceleration.
-//    /*!
-//     * Returns the acceleration. No arguments are passed to this function for generality.
-//     * Instead, all data required for computation is to be obtained from pointers to functions/
-//     * classes/structs, etc which are to be set in a derived class and evaluated by the
-//     * updateMembers() function below.
-//     * \return Acceleration.
-//     * \sa updateMembers().
-//     */
-//    virtual AccelerationDataType getAcceleration( ) = 0;
 
     //! Update member variables used by the gravity deformation model.
     /*!
@@ -127,37 +115,6 @@ private:
 };
 
 
-// //! Update the members of a gravity deformation model and evaluate the deformation.
-// /*!
-//  * Updates the member variables of a gravity deformation model and subsequently evaluates the
-//  * deformation. 
-//  * \param deformationModel Gravity deformation model that is to be evaluated.
-//  * \param currentTime Time at which the gravity deformation model is to be updated.
-//  * \return Deformation that is obtained following the member update.
-//  */
-// Eigen::VectorXd updateAndGetDeformation(
-//         const std::shared_ptr< GravityDeformationModel > deformationModel,
-//         const double currentTime = TUDAT_NAN )
-// {
-//     // Update members.
-//     deformationModel->updateMembers( currentTime );
-
-//     // Evaluate and return deformation.
-//     return deformationModel->getDeformation( );
-// }
-
-
-// //! Typedef defining a list of accelerations acting on a single body, key is the name of each
-// //! body exerting a acceletation, value is a list of accelerations exerted by that body.
-// typedef std::unordered_map< std::string, std::vector<
-// std::shared_ptr< basic_astrodynamics::AccelerationModel< Eigen::Vector3d > > > >
-// SingleBodyAccelerationMap;
-
-
-// //! Typedef defining a list of accelerations acting on a set of bodies, key is the name of each
-// //! body undergoing an acceletation, value is SingleBodyAccelerationMap, defining all accelerations
-// //! acting on it.
-// typedef std::unordered_map< std::string, SingleBodyAccelerationMap > AccelerationMap;
 
 //! Typedef for the gravity deformation model map.
 typedef std::map< std::string, std::vector< std::shared_ptr< GravityDeformationModel > > > GravityDeformationModelMap;
@@ -229,7 +186,8 @@ public:
             [ ]( ){ return Eigen::Quaterniond( Eigen::Matrix3d::Identity( ) ); },
             const std::function< Eigen::Matrix3d( ) >
                 rotationToLocalFrameDerivativeFunction = [ ]( ){ return Eigen::Matrix3d::Zero( ); },
-            const Eigen::VectorXd staticCoefficients = Eigen::VectorXd::Zero( 3 ) ) //,
+            const Eigen::VectorXd staticCoefficients = Eigen::VectorXd::Zero( 3 ),
+            const bool includeOrder1 = true ) //,
             /*std::shared_ptr< basic_mathematics::SphericalHarmonicsCache > sphericalHarmonicsCache =
             std::make_shared< basic_mathematics::SphericalHarmonicsCache >( ) )*/ : 
             GravityDeformationModel( ),
@@ -253,25 +211,29 @@ public:
               rotationFromBodyFixedToIntegrationFrameFunction ),
           rotationToBodyFixedDerivativeFunction_( rotationToLocalFrameDerivativeFunction ),
           staticCoefficients_( staticCoefficients ),
+          includeOrder1_( includeOrder1 ),
           /*sphericalHarmonicsCache_( sphericalHarmonicsCache ),*/
           saveSphericalHarmonicTermsSeparately_( false )
     {
 
         // Initialise nominal coefficient values
-        nominalCoefficients_ = Eigen::VectorXd::Zero(3);
+        nominalCoefficients_ = Eigen::VectorXd::Zero( 5 );
         nominalCoefficients_[ 0 ] = getCosineHarmonicsCoefficients( )( 2, 0 );
-        nominalCoefficients_[ 1 ] = getCosineHarmonicsCoefficients( )( 2, 2 );
-        nominalCoefficients_[ 2 ] = getSineHarmonicsCoefficients( )( 2, 2 );
+        nominalCoefficients_[ 1 ] = getCosineHarmonicsCoefficients( )( 2, 1 );
+        nominalCoefficients_[ 2 ] = getCosineHarmonicsCoefficients( )( 2, 2 );
+        nominalCoefficients_[ 3 ] = getSineHarmonicsCoefficients( )( 2, 1 );
+        nominalCoefficients_[ 4 ] = getSineHarmonicsCoefficients( )( 2, 2 );
         std::cout << "original nominal coefficients: " << nominalCoefficients_.transpose( ) << std::endl;
 
-        equilibriumCoefficients_ = Eigen::VectorXd::Zero( 3 ); 
-        derivativeEquilibriumCoefficients_ = Eigen::VectorXd::Zero( 3 );
-        nuCoefficients_ = Eigen::VectorXd::Zero( 3 ); 
+        equilibriumCoefficients_ = Eigen::VectorXd::Zero( 5 ); 
+        derivativeEquilibriumCoefficients_ = Eigen::VectorXd::Zero( 5 );
 
         // Tranform to **unnormalised** coefficients
         staticCoefficients_[ 0 ] *= basic_mathematics::calculateLegendreGeodesyNormalizationFactor( 2, 0 );
-        staticCoefficients_[ 1 ] *= basic_mathematics::calculateLegendreGeodesyNormalizationFactor( 2, 2 );
+        staticCoefficients_[ 1 ] *= basic_mathematics::calculateLegendreGeodesyNormalizationFactor( 2, 1 );
         staticCoefficients_[ 2 ] *= basic_mathematics::calculateLegendreGeodesyNormalizationFactor( 2, 2 );
+        staticCoefficients_[ 3 ] *= basic_mathematics::calculateLegendreGeodesyNormalizationFactor( 2, 1 );
+        staticCoefficients_[ 4 ] *= basic_mathematics::calculateLegendreGeodesyNormalizationFactor( 2, 2 );
 
         // // Update rotation and states
         // rotationToIntegrationFrame_ = rotationFromBodyFixedToIntegrationFrameFunction_( );
@@ -332,15 +294,19 @@ public:
             sineHarmonicCoefficients = getSineHarmonicsCoefficients( );
 
             nominalCoefficients_[ 0 ] = cosineHarmonicCoefficients( 2, 0 );
-            nominalCoefficients_[ 1 ] = cosineHarmonicCoefficients( 2, 2 );
-            nominalCoefficients_[ 2 ] = sineHarmonicCoefficients( 2, 2 );            
+            nominalCoefficients_[ 1 ] = cosineHarmonicCoefficients( 2, 1 );
+            nominalCoefficients_[ 2 ] = cosineHarmonicCoefficients( 2, 2 );
+            nominalCoefficients_[ 3 ] = sineHarmonicCoefficients( 2, 1 );   
+            nominalCoefficients_[ 4 ] = sineHarmonicCoefficients( 2, 2 );            
             // std::cout << "in update, normalised nominal coefs with static " << nominalCoefficients_[ 0 ] << " " << nominalCoefficients_[ 1 ]
             // << " " << nominalCoefficients_[ 2 ] << std::endl;
 
             // Tranform to **unnormalised** coefficients
             nominalCoefficients_[ 0 ] *= basic_mathematics::calculateLegendreGeodesyNormalizationFactor( 2, 0 );
-            nominalCoefficients_[ 1 ] *= basic_mathematics::calculateLegendreGeodesyNormalizationFactor( 2, 2 );
+            nominalCoefficients_[ 1 ] *= basic_mathematics::calculateLegendreGeodesyNormalizationFactor( 2, 1 );
             nominalCoefficients_[ 2 ] *= basic_mathematics::calculateLegendreGeodesyNormalizationFactor( 2, 2 );
+            nominalCoefficients_[ 3 ] *= basic_mathematics::calculateLegendreGeodesyNormalizationFactor( 2, 1 );
+            nominalCoefficients_[ 4 ] *= basic_mathematics::calculateLegendreGeodesyNormalizationFactor( 2, 2 );
 
             // std::cout << "in update, unnormalised nominal coefs with static " << nominalCoefficients_[ 0 ] << " " << nominalCoefficients_[ 1 ]
             // << " " << nominalCoefficients_[ 2 ] << std::endl;
@@ -383,15 +349,25 @@ public:
             // Compute spherical coordinates of perturbing body in body-fixed frame
             Eigen::Vector3d currentSphericalPositionPerturbingBody = 
                 coordinate_conversions::convertCartesianToSpherical( currentRelativePosition_ );
-            currentLongitude_ = - currentSphericalPositionPerturbingBody[ 2 ]; // MINUS THE LONGITUDE ACTUALLY
-            double latitude = mathematical_constants::PI / 2.0 - currentSphericalPositionPerturbingBody.y( );
+            currentLongitude_ = currentSphericalPositionPerturbingBody[ 2 ]; 
+            currentLatitude_ = mathematical_constants::PI / 2.0 - currentSphericalPositionPerturbingBody.y( );
 
+            // MOVE DERIVATIVE CALCULATION TO UPDATE EQUILIBRIUM(?)
             // Compute current derivative of the perturbing body's body-fixed longitude
-            // (MINUS SIGN IN FRONT BECAUSE MINUS LONGITUDE)
-            currentLongitudeDerivative_ = - (
+            currentLongitudeDerivative_ = (
                 ( currentRelativeVelocity_[ 1 ] * currentRelativePosition_[ 0 ] 
                 - currentRelativeVelocity_[ 0 ] * currentRelativePosition_[ 1 ] ) 
                 / ( currentRelativePosition_[ 0 ] * currentRelativePosition_[ 0 ] + currentRelativePosition_[ 1 ] * currentRelativePosition_[ 1 ] ) );
+
+            // Compute current derivative of the perturbing body's body-fixed latitude
+            double currentDistance = currentRelativePosition_.segment( 0, 3 ).norm( );
+            double currentDistanceDerivative = 
+                ( currentRelativePosition_[ 0 ] * currentRelativeVelocity_[ 0 ] 
+                + currentRelativePosition_[ 1 ] * currentRelativeVelocity_[ 1 ] 
+                + currentRelativePosition_[ 2 ] * currentRelativeVelocity_[ 2 ] ) / currentDistance;
+            currentLatitudeDerivative_ = 
+                ( currentRelativeVelocity_[2] * currentDistance - currentRelativePosition_[2] * currentDistanceDerivative ) /
+                ( currentDistance * std::sqrt( currentRelativePosition_[ 0 ] * currentRelativePosition_[ 0 ] + currentRelativePosition_[ 1 ] * currentRelativePosition_[ 1 ] ) );
 
             // std::cout << "in updateMembers time " << currentTime << " longitude " << currentLongitude_ << " distance " <<
                 //  currentRelativePosition_.segment( 0, 3 ).norm( ) << " longitude derivative " << currentLongitudeDerivative_ << std::endl;
@@ -404,7 +380,9 @@ public:
             // updatePropagatedCoefficients( );
 
             // // THE CURRENT COEFFICIENTS SHOULD BE UPDATED AT THIS POINT
-            //  std::cout << "nominal coefficients: " << nominalCoefficients_.transpose( ) << std::endl;
+            // std::cout << "currentLongitude_ " << currentLongitude_ << std::endl;
+            // std::cout << "currentLatitude_ " << currentLatitude_ << std::endl;
+            //  std::cout << "equilibriumCoefficients_: " << equilibriumCoefficients_.transpose( ) << std::endl;
             //  std::cout << "in update equilibriumCoefficients: " << equilibriumCoefficients_[0] << " " <<
             //  equilibriumCoefficients_[1] << " " << equilibriumCoefficients_[2] << std::endl;
             //  std::cout << "derivativeEquilibriumCoefficients_ " << derivativeEquilibriumCoefficients_.transpose( ) << std::endl; 
@@ -425,11 +403,6 @@ public:
         // }
     }
 
-    // void updatePropagatedCoefficients( const double currentTime = TUDAT_NAN )
-    // {
-    //     nuCoefficients_ = ( 1.0 / ( 1.0 - maxwellRelaxationTime_ / globalRelaxationTime_ ) ) * 
-    //         ( nominalCoefficients_ - maxwellRelaxationTime_ / globalRelaxationTime_ * equilibriumCoefficients_ ); 
-    // }
 
     void updateEquilibriumDeformation( const double currentTime = TUDAT_NAN )
     {
@@ -467,14 +440,22 @@ public:
         // std::cout << "cos2gamma " << cos2gamma << " " << std::cos( 2.0 * currentLongitude_ ) << 
         // " sin2gamma " << sin2gamma << " " << - std::sin( 2.0 * currentLongitude_ ) << std::endl;
 
-        equilibriumCoefficients_[ 0 ] = - k2_ * ( 
-            //rotationRate * rotationRate * referenceRadius_* referenceRadius_ * referenceRadius_ 
-            // / ( 3.0 * gravitationalParameterDeformingBody_ ) 
-            + 0.5 * gravitationalParametersRatio * radiusRatioPowerThree );        
-        equilibriumCoefficients_[ 1 ] = k2_ / 4.0 * gravitationalParametersRatio * radiusRatioPowerThree * 
-            std::cos( 2.0 * currentLongitude_ );
-        equilibriumCoefficients_[ 2 ] = - k2_ / 4.0 * gravitationalParametersRatio * radiusRatioPowerThree * 
-            std::sin( 2.0 * currentLongitude_ );
+        equilibriumCoefficients_[ 0 ] = k2_ * ( 
+            // - rotationRate * rotationRate * referenceRadius_* referenceRadius_ * referenceRadius_ 
+            //  / ( 3.0 * gravitationalParameterDeformingBody_ ) 
+            + 0.5 * gravitationalParametersRatio * radiusRatioPowerThree 
+            * ( 3.0 * std::sin( currentLatitude_ ) * std::sin( currentLatitude_ ) - 1.0 ) ); 
+        equilibriumCoefficients_[ 2 ] = k2_ / 4.0 * gravitationalParametersRatio * radiusRatioPowerThree * 
+            ( 1.0 - std::sin( currentLatitude_ ) * std::sin( currentLatitude_ ) ) * std::cos( 2.0 * currentLongitude_ );
+        equilibriumCoefficients_[ 4 ] = k2_ / 4.0 * gravitationalParametersRatio * radiusRatioPowerThree * 
+            ( 1.0 - std::sin( currentLatitude_ ) * std::sin( currentLatitude_ ) ) * std::sin( 2.0 * currentLongitude_ );
+        if ( includeOrder1_ ) 
+        {
+            equilibriumCoefficients_[ 1 ] = - k2_ * gravitationalParametersRatio * radiusRatioPowerThree 
+            * ( - std::cos( currentLatitude_ ) * std::sin( currentLatitude_ ) ) * std::cos( currentLongitude_ );
+            equilibriumCoefficients_[ 3 ] = - k2_ * gravitationalParametersRatio * radiusRatioPowerThree 
+            * ( - std::cos( currentLatitude_ ) * std::sin( currentLatitude_ ) ) * std::sin( currentLongitude_ );
+        }
 
 
         // std::cout << "equilibriumCoefficients_ " << equilibriumCoefficients_.transpose( ) << std::endl;
@@ -491,27 +472,47 @@ public:
             + currentRelativePosition_[ 2 ] * currentRelativeVelocity_[ 2 ] ) / relativeDistance;
 
         derivativeEquilibriumCoefficients_[ 0 ] = - k2_ * ( 
-            // 2.0 * rotationRate * referenceRadius_ * referenceRadius_ * referenceRadius_ / ( 3.0 * gravitationalParameterDeformingBody_ ) * rotationRateDerivative
-            - 3.0 / 2.0 * gravitationalParametersRatio * radiusRatioPowerThree * 
-            currentRelativePosition_.dot( currentRelativeVelocity_ ) / ( relativeDistance * relativeDistance ) );
+            //2.0 * rotationRate * referenceRadius_ * referenceRadius_ * referenceRadius_ / ( 3.0 * gravitationalParameterDeformingBody_ ) * rotationRateDerivative
+            + 1.0 / 2.0 * gravitationalParametersRatio * radiusRatioPowerThree 
+            * 3.0 * currentDistanceDerivative / relativeDistance * ( 3.0 * std::sin( currentLatitude_ ) * std::sin( currentLatitude_ ) - 1.0 )
+            + 1.0 / 2.0 * gravitationalParametersRatio * radiusRatioPowerThree 
+            * ( 6.0 * currentLatitudeDerivative_ * std::sin( currentLatitude_ ) * std::cos( currentLatitude_ ) )  );
 
-        derivativeEquilibriumCoefficients_[ 1 ] = - k2_ / 4.0 * gravitationalParametersRatio * radiusRatioPowerThree * (
-            3.0 * currentDistanceDerivative / relativeDistance * std::cos( 2.0 * currentLongitude_ )
-            + 2.0 * currentLongitudeDerivative_ * std::sin( 2.0 * currentLongitude_ ) );
+        derivativeEquilibriumCoefficients_[ 2 ] = - k2_ / 4.0 * gravitationalParametersRatio * radiusRatioPowerThree * (
+            3.0 * currentDistanceDerivative / relativeDistance 
+            * ( 1.0 - std::sin( currentLatitude_ ) * std::sin( currentLatitude_ ) ) * std::cos( 2.0 * currentLongitude_ )
+            + 2.0 * currentLongitudeDerivative_ * std::sin( 2.0 * currentLongitude_ ) * ( 1.0 - std::sin( currentLatitude_ ) * std::sin( currentLatitude_ ) ) 
+            + 2.0 * std::cos( 2.0 * currentLongitude_ ) * currentLatitudeDerivative_ * std::sin( currentLatitude_ ) * std::cos( currentLatitude_ ) );
 
-        derivativeEquilibriumCoefficients_[ 2 ] = k2_ / 4.0 * gravitationalParametersRatio * radiusRatioPowerThree * (
-            3.0 * currentDistanceDerivative / relativeDistance * std::sin( 2.0 * currentLongitude_ )
-            - 2.0 * currentLongitudeDerivative_ * std::cos( 2.0 * currentLongitude_ ) );
+        derivativeEquilibriumCoefficients_[ 4 ] = - k2_ / 4.0 * gravitationalParametersRatio * radiusRatioPowerThree * (
+            3.0 * currentDistanceDerivative / relativeDistance
+            * ( 1.0 - std::sin( currentLatitude_ ) * std::sin( currentLatitude_ ) ) * std::sin( 2.0 * currentLongitude_ )
+            - 2.0 * currentLongitudeDerivative_ * std::cos( 2.0 * currentLongitude_ ) * ( 1.0 - std::sin( currentLatitude_ ) * std::sin( currentLatitude_ ) ) 
+            + 2.0 * std::sin( 2.0 * currentLongitude_ ) * currentLatitudeDerivative_ * std::sin( currentLatitude_ ) * std::cos( currentLatitude_ ) );
+
+        if ( includeOrder1_ ) 
+        {
+            derivativeEquilibriumCoefficients_[ 1 ] = - k2_ * gravitationalParametersRatio * radiusRatioPowerThree * (
+            3.0 * currentDistanceDerivative / relativeDistance 
+            * std::sin( currentLatitude_ ) * std::cos( currentLatitude_ ) * std::cos( currentLongitude_ )
+            + currentLongitudeDerivative_ * std::sin( currentLatitude_ ) * std::cos( currentLatitude_ ) * std::sin( currentLongitude_ )
+            - currentLatitudeDerivative_ * 
+            ( std::cos( currentLatitude_ ) * std::cos( currentLatitude_ ) - std::sin( currentLatitude_ ) * std::sin( currentLatitude_ ) ) 
+            * std::cos( currentLongitude_ ) );
+
+            derivativeEquilibriumCoefficients_[ 3 ] = - k2_ * gravitationalParametersRatio * radiusRatioPowerThree * (
+            3.0 * currentDistanceDerivative / relativeDistance 
+            * std::sin( currentLatitude_ ) * std::cos( currentLatitude_ ) * std::sin( currentLongitude_ )
+            - currentLongitudeDerivative_ * std::sin( currentLatitude_ ) * std::cos( currentLatitude_ ) * std::cos( currentLongitude_ )
+            - currentLatitudeDerivative_ * 
+            ( std::cos( currentLatitude_ ) * std::cos( currentLatitude_ ) - std::sin( currentLatitude_ ) * std::sin( currentLatitude_ ) ) 
+            * std::sin( currentLongitude_ ) );
+        }
 
         // std::cout << "equilibriumCoefficients_ " << equilibriumCoefficients_.transpose( ) << std::endl;
         // std::cout << "derivativeEquilibriumCoefficients_ " << derivativeEquilibriumCoefficients_.transpose( ) << std::endl;
     }
 
-    // void updateNominalCoefficients( )
-    // {
-    //     nominalCoefficients_ = ( 1 - maxwellRelaxationTime_ / globalRelaxationTime_ ) * nuCoefficients_ 
-    //         + maxwellRelaxationTime_ / globalRelaxationTime_ * equilibriumCoefficients_;
-    // }
 
 
     Eigen::VectorXd getCurrentCoefficients( )
@@ -614,75 +615,75 @@ public:
         return rotationToIntegrationFrame_.toRotationMatrix( );
     }
 
-    //! Function to set whether each of the separate spherical harmonic terms should be saved
-    /*!
-     * Function to set whether each of the separate spherical harmonic terms should be saved (in accelerationPerTerm_ member
-     * variable of this class)
-     * \param saveSphericalHarmonicTermsSeparately Boolean denoting whether each of the separate spherical harmonic terms should
-     * be saved (in accelerationPerTerm_ member variable of this class
-     */
-    void setSaveSphericalHarmonicTermsSeparately( const bool saveSphericalHarmonicTermsSeparately )
-    {
-        saveSphericalHarmonicTermsSeparately_ = saveSphericalHarmonicTermsSeparately;
-    }
+    // //! Function to set whether each of the separate spherical harmonic terms should be saved
+    // /*!
+    //  * Function to set whether each of the separate spherical harmonic terms should be saved (in accelerationPerTerm_ member
+    //  * variable of this class)
+    //  * \param saveSphericalHarmonicTermsSeparately Boolean denoting whether each of the separate spherical harmonic terms should
+    //  * be saved (in accelerationPerTerm_ member variable of this class
+    //  */
+    // void setSaveSphericalHarmonicTermsSeparately( const bool saveSphericalHarmonicTermsSeparately )
+    // {
+    //     saveSphericalHarmonicTermsSeparately_ = saveSphericalHarmonicTermsSeparately;
+    // }
 
-    //! Function to retrieve the contributions of separate degrees/ordesr to the acceleration, concatenated in a single vector
-    /*!
-     * Function to retrieve the contributions of specific separate degree/order to the acceleration, concatenated in a single
-     * vector
-     * \param coefficientIndices List of degree/order at which the contributions to the full acceleration are to be retrieved
-     * \return Contributions of separate degrees/ordesr to the acceleration, concatenated in a single vector
-     */
-    Eigen::VectorXd getConcatenatedAccelerationComponents( const std::vector< std::pair< int, int > >& coefficientIndices )
-    {
-        if( !saveSphericalHarmonicTermsSeparately_ )
-        {
-            throw std::runtime_error( "Error when retrieving component accelerations from spherial harmonic acceleration, components not saved" );
-        }
+    // //! Function to retrieve the contributions of separate degrees/ordesr to the acceleration, concatenated in a single vector
+    // /*!
+    //  * Function to retrieve the contributions of specific separate degree/order to the acceleration, concatenated in a single
+    //  * vector
+    //  * \param coefficientIndices List of degree/order at which the contributions to the full acceleration are to be retrieved
+    //  * \return Contributions of separate degrees/ordesr to the acceleration, concatenated in a single vector
+    //  */
+    // Eigen::VectorXd getConcatenatedAccelerationComponents( const std::vector< std::pair< int, int > >& coefficientIndices )
+    // {
+    //     if( !saveSphericalHarmonicTermsSeparately_ )
+    //     {
+    //         throw std::runtime_error( "Error when retrieving component accelerations from spherial harmonic acceleration, components not saved" );
+    //     }
 
-        Eigen::VectorXd returnVector = Eigen::VectorXd( 3 * coefficientIndices.size( ) );
-        for( unsigned int i = 0; i < coefficientIndices.size( ); i++ )
-        {
-            if( accelerationPerTerm_.count( coefficientIndices.at( i ) ) != 0 )
-            {
-                returnVector.segment( i * 3, 3 ) = accelerationPerTerm_.at( coefficientIndices.at( i ) );
-            }
-            else
-            {
-                throw std::runtime_error( "Error when retrieving spherical harmonic acceleration at degree/order: " +
-                                          std::to_string( coefficientIndices.at( i ).first ) + "/" +
-                                          std::to_string( coefficientIndices.at( i ).second ) +
-                                          ". This degree/order combination is not within the selected range of the current acceleration model." );
-            }
+    //     Eigen::VectorXd returnVector = Eigen::VectorXd( 3 * coefficientIndices.size( ) );
+    //     for( unsigned int i = 0; i < coefficientIndices.size( ); i++ )
+    //     {
+    //         if( accelerationPerTerm_.count( coefficientIndices.at( i ) ) != 0 )
+    //         {
+    //             returnVector.segment( i * 3, 3 ) = accelerationPerTerm_.at( coefficientIndices.at( i ) );
+    //         }
+    //         else
+    //         {
+    //             throw std::runtime_error( "Error when retrieving spherical harmonic acceleration at degree/order: " +
+    //                                       std::to_string( coefficientIndices.at( i ).first ) + "/" +
+    //                                       std::to_string( coefficientIndices.at( i ).second ) +
+    //                                       ". This degree/order combination is not within the selected range of the current acceleration model." );
+    //         }
 
-        }
-        return returnVector;
-    }
+    //     }
+    //     return returnVector;
+    // }
 
-    Eigen::VectorXd getConcatenatedAccelerationComponentNorms( const std::vector< std::pair< int, int > >& coefficientIndices )
-    {
-        if( !saveSphericalHarmonicTermsSeparately_ )
-        {
-            throw std::runtime_error( "Error when retrieving component accelerations from spherial harmonic acceleration, components not saved" );
-        }
+    // Eigen::VectorXd getConcatenatedAccelerationComponentNorms( const std::vector< std::pair< int, int > >& coefficientIndices )
+    // {
+    //     if( !saveSphericalHarmonicTermsSeparately_ )
+    //     {
+    //         throw std::runtime_error( "Error when retrieving component accelerations from spherial harmonic acceleration, components not saved" );
+    //     }
 
-        Eigen::VectorXd returnVector = Eigen::VectorXd( coefficientIndices.size( ) );
-        for( unsigned int i = 0; i < coefficientIndices.size( ); i++ )
-        {
-            if( accelerationPerTerm_.count( coefficientIndices.at( i ) ) != 0 )
-            {
-                returnVector( i ) = accelerationPerTerm_.at( coefficientIndices.at( i ) ).norm( );
-            }
-            else
-            {
-                throw std::runtime_error( "Error when retrieving spherical harmonic acceleration at degree/order: " +
-                                          std::to_string( coefficientIndices.at( i ).first ) + "/" +
-                                          std::to_string( coefficientIndices.at( i ).second ) +
-                                          ". This degree/order combination is not within the selected range of the current acceleration model." );
-            }
-        }
-        return returnVector;
-    }
+    //     Eigen::VectorXd returnVector = Eigen::VectorXd( coefficientIndices.size( ) );
+    //     for( unsigned int i = 0; i < coefficientIndices.size( ); i++ )
+    //     {
+    //         if( accelerationPerTerm_.count( coefficientIndices.at( i ) ) != 0 )
+    //         {
+    //             returnVector( i ) = accelerationPerTerm_.at( coefficientIndices.at( i ) ).norm( );
+    //         }
+    //         else
+    //         {
+    //             throw std::runtime_error( "Error when retrieving spherical harmonic acceleration at degree/order: " +
+    //                                       std::to_string( coefficientIndices.at( i ).first ) + "/" +
+    //                                       std::to_string( coefficientIndices.at( i ).second ) +
+    //                                       ". This degree/order combination is not within the selected range of the current acceleration model." );
+    //         }
+    //     }
+    //     return returnVector;
+    // }
 
     //! Function to retrieve maximum degree of gravity field expansion
     /*!
@@ -786,8 +787,6 @@ private:
 
     Eigen::VectorXd nominalCoefficients_;
 
-    Eigen::VectorXd nuCoefficients_;
-
     Eigen::VectorXd staticCoefficients_;
 
     //! Matrix of cosine coefficients.
@@ -861,7 +860,13 @@ private:
     //! Current body-fixed longitude of the perturbing body
     double currentLongitude_;
 
+    //! Current body-fixed latitude of the perturbing body
+    double currentLatitude_;
+
     double currentLongitudeDerivative_;
+    double currentLatitudeDerivative_;
+
+    const bool includeOrder1_;
 
     std::function< Eigen::Vector3d( ) > angularVelocityDeformingBody_;
     std::function< Eigen::Vector3d( ) > angularVelocityDerivativeDeformingBody_;

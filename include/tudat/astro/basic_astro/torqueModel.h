@@ -132,8 +132,6 @@ public:
     {
         // if( !( currentTime == currentTime_ ) )
         // {
-            // std::cout << "in update members inertial torque" << std::endl;
-            // std::cout << "inertiaTensor" << std::endl;
             // std::cout << inertiaTensorFunction_( ) << std::endl;
             // std::cout << "inertiaTensorTimeDerivative" << std::endl;
             // std::cout << inertiaTensorDerivativeFunction_( ) << std::endl;

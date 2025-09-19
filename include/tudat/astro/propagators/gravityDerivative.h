@@ -126,7 +126,7 @@ public:
             for( unsigned int i = 0; i < gravityDeformationModelIterator_->second.size( ); i++ )
             {
                 // gravityDeformationModelIterator_->second.at ( i )->updateMembers( );
-                stateDerivative.block( currentIndex * 3, 0, 3, 1 ) +=
+                stateDerivative.block( currentIndex * 5, 0, 5, 1 ) +=
                             gravityDeformationModelIterator_->second.at ( i )->getDeformation( );
                 currentIndex++;
             }
@@ -239,7 +239,7 @@ public:
      */
     int getConventionalStateSize( )
     {
-        return 3 * bodiesToIntegrate_.size( );
+        return 5 * bodiesToIntegrate_.size( );
     }
 
     //! Get list of bodies for which the gravity coefficients are to be propagated.

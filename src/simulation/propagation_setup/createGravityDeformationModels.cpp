@@ -92,7 +92,8 @@ createMaxwellGravityFieldDeformationModel(
                     std::bind( &Body::getStateByReference, perturbingBody, std::placeholders::_1 ),
                     std::bind( &Body::getCurrentRotationToGlobalFrame, deformingBody ),
                     std::bind( &Body::getCurrentRotationMatrixDerivativeToLocalFrame, deformingBody ),
-                    maxwellDeformationSettings->staticCoefficients_ );
+                    maxwellDeformationSettings->staticCoefficients_,
+                    maxwellDeformationSettings->includeOrder1_ );
         }
     }
     return deformationModel;
