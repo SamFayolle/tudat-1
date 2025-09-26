@@ -117,18 +117,23 @@ public:
         stateDerivative.setZero( );
 
         // Iterate over all gravity deformation models, retrieve value and put into corresponding entry.
-        int currentIndex = 0;
+        // int currentIndex = 0;
         for( gravityDeformationModelIterator_ = gravityDeformationModels_.begin( );
              gravityDeformationModelIterator_ != gravityDeformationModels_.end( );
              gravityDeformationModelIterator_++ )
         {
+            int currentIndex = -1;
+            auto it = std::find(bodiesToIntegrate_.begin(), bodiesToIntegrate_.end(), gravityDeformationModelIterator_->first);
+            if ( it != bodiesToIntegrate_.end() )
+                currentIndex = static_cast< int >( it - bodiesToIntegrate_.begin() );
+
             stateDerivative( currentIndex, 0 ) = 0.0;
             for( unsigned int i = 0; i < gravityDeformationModelIterator_->second.size( ); i++ )
             {
                 // gravityDeformationModelIterator_->second.at ( i )->updateMembers( );
                 stateDerivative.block( currentIndex * 5, 0, 5, 1 ) +=
                             gravityDeformationModelIterator_->second.at ( i )->getDeformation( );
-                currentIndex++;
+                // currentIndex++;
             }
 
         }

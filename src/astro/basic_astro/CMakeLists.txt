@@ -30,6 +30,7 @@ set(basic_astrodynamics_SOURCES
         "torqueModelTypes.cpp"
         "torqueModel.cpp"
         "gravityDeformationModelTypes.cpp"
+        "gravityDeformationModel.cpp"
         )
 
 # Set the header files.

@@ -93,7 +93,8 @@ createMaxwellGravityFieldDeformationModel(
                     std::bind( &Body::getCurrentRotationToGlobalFrame, deformingBody ),
                     std::bind( &Body::getCurrentRotationMatrixDerivativeToLocalFrame, deformingBody ),
                     maxwellDeformationSettings->staticCoefficients_,
-                    maxwellDeformationSettings->includeOrder1_ );
+                    maxwellDeformationSettings->includeOrder1_,
+                    maxwellDeformationSettings->negativeSignLatitude_ );
         }
     }
     return deformationModel;

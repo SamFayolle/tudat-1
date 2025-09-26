@@ -269,6 +269,7 @@ std::map< propagators::EnvironmentModelsToUpdate, std::vector< std::string > > c
     for( unsigned int i = 0; i < bodiesToIntegrate.size( ); i++ )
     {
         singleTorqueUpdateNeeds[ body_mass_distribution_update ].push_back( bodiesToIntegrate.at( i ) );
+        singleTorqueUpdateNeeds[ body_mass_update ].push_back( bodiesToIntegrate.at( i ) );
     }
     addEnvironmentUpdates( environmentModelsToUpdate, singleTorqueUpdateNeeds );
 
