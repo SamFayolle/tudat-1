@@ -87,6 +87,8 @@ public:
         {
             if( gravityDeformationModels_.count( bodiesToIntegrate_.at( i ) ) == 0 )
             {
+                std::cerr << "Warning, propagating gravity coefficients of body " + bodiesToIntegrate_.at( i )  +
+                           " without any gravity deformation model." << std::endl;
                 gravityDeformationModels_[ bodiesToIntegrate_.at( i ) ] =
                         std::vector< std::shared_ptr< basic_astrodynamics::GravityDeformationModel > >( );
             }
@@ -128,12 +130,44 @@ public:
                 currentIndex = static_cast< int >( it - bodiesToIntegrate_.begin() );
 
             stateDerivative( currentIndex, 0 ) = 0.0;
+            // Eigen::VectorXd equilibriumCoefficients = Eigen::VectorXd::Zero(5);
+            // Eigen::VectorXd derivativeEquilibriumCoefficients = Eigen::VectorXd::Zero(5);
             for( unsigned int i = 0; i < gravityDeformationModelIterator_->second.size( ); i++ )
             {
                 // gravityDeformationModelIterator_->second.at ( i )->updateMembers( );
                 stateDerivative.block( currentIndex * 5, 0, 5, 1 ) +=
                             gravityDeformationModelIterator_->second.at ( i )->getDeformation( );
                 // currentIndex++;
+            //     if ( std::dynamic_pointer_cast< basic_astrodynamics::MaxwellGravityDeformationModel >( 
+            //         gravityDeformationModelIterator_->second.at ( i ) ) != nullptr )
+            //     {
+            //         std::shared_ptr< basic_astrodynamics::MaxwellGravityDeformationModel > maxwellModel = std::dynamic_pointer_cast<
+            //             basic_astrodynamics::MaxwellGravityDeformationModel >( gravityDeformationModelIterator_->second.at ( i ) );
+            //         equilibriumCoefficients += maxwellModel->getEquilibriumCoefficients();
+            //         derivativeEquilibriumCoefficients += maxwellModel->getDerivativeEquilibriumCoefficients();
+            //     } 
+            //     else // nominal code that was there before proper multi-body tides implementation. does not work for Maxwell:
+            //     // we cannot sum the deformation directly, we have to compute it wrt to the sum of the forcings
+            //     {
+            //         // gravityDeformationModelIterator_->second.at ( i )->updateMembers( );
+            //         stateDerivative.block( currentIndex * 5, 0, 5, 1 ) +=
+            //             gravityDeformationModelIterator_->second.at ( i )->getDeformation( );
+            //         // currentIndex++;
+            //     }
+            //     // // gravityDeformationModelIterator_->second.at ( i )->updateMembers( );
+            //     // stateDerivative.block( currentIndex * 5, 0, 5, 1 ) +=
+            //     //             gravityDeformationModelIterator_->second.at ( i )->getDeformation( );
+            //     // // currentIndex++;
+            // }
+            // if ( std::dynamic_pointer_cast< basic_astrodynamics::MaxwellGravityDeformationModel >( 
+            //         gravityDeformationModelIterator_->second.at ( 0 ) ) != nullptr )
+            // {
+            //     std::shared_ptr< basic_astrodynamics::MaxwellGravityDeformationModel > maxwellModel = std::dynamic_pointer_cast<
+            //             basic_astrodynamics::MaxwellGravityDeformationModel >( gravityDeformationModelIterator_->second.at ( 0 ) );
+            //     Eigen::VectorXd currentDeformation = ( 1.0 / maxwellModel->getGlobalRelaxationTime( ) ) * ( 
+            //         equilibriumCoefficients - maxwellModel->getCurrentCoefficients( )  
+            //         + maxwellModel->getMaxwellRelaxationTime( ) * derivativeEquilibriumCoefficients ); 
+            //     stateDerivative.block( currentIndex * 5, 0, 5, 1 ) = currentDeformation;
             }
 
         }
@@ -193,8 +227,8 @@ public:
     //     {
     //         for( unsigned int i = 0; i < gravityDeformationModelIterator_->second.size( ); i++ )
     //         {
-    //             std::shared_ptr< basic_astrodynamics::MaxwellGravityDeformationModel > maxwellModel = std::dynamic_pointer_cast<
-    //                 basic_astrodynamics::MaxwellGravityDeformationModel >( gravityDeformationModelIterator_->second.at ( i ) );
+                // std::shared_ptr< basic_astrodynamics::MaxwellGravityDeformationModel > maxwellModel = std::dynamic_pointer_cast<
+                //     basic_astrodynamics::MaxwellGravityDeformationModel >( gravityDeformationModelIterator_->second.at ( i ) );
     //             std::cout << "maxwellModel->computeNominalCoefficients( propagatedCoefficients ) " << 
     //                 maxwellModel->computeNominalCoefficients( propagatedCoefficients ) << std::endl;
     //             nominalCoefficients.block( 3 * counter, 0, 3, 1 ) = maxwellModel->computeNominalCoefficients( 

@@ -765,8 +765,11 @@ createGravityPropagationEnvironmentUpdaterSettings(
                 singleGravityDeformationModelUpdateNeeds[ body_translational_state_update ].push_back( gravityDeformationModelIterator->first );
                 singleGravityDeformationModelUpdateNeeds[ body_rotational_state_update ].push_back( gravityDeformationModelIterator->first );
                 // singleGravityDeformationModelUpdateNeeds[ body_mass_distribution_update ].push_back( gravityDeformationModelIterator->first );
-                singleGravityDeformationModelUpdateNeeds[ body_translational_state_update ].push_back( maxwellGravityModel->getPerturbingBody( ) );
-                singleGravityDeformationModelUpdateNeeds[ body_rotational_state_update ].push_back( maxwellGravityModel->getPerturbingBody( ) );
+                for ( unsigned int k = 0 ; k < maxwellGravityModel->getPerturbingBody( ).size( ) ; k++ )
+                {
+                    singleGravityDeformationModelUpdateNeeds[ body_translational_state_update ].push_back( maxwellGravityModel->getPerturbingBody( ).at( k ) );
+                    singleGravityDeformationModelUpdateNeeds[ body_rotational_state_update ].push_back( maxwellGravityModel->getPerturbingBody( ).at( k ) );
+                }
                 break;
             }
             default:

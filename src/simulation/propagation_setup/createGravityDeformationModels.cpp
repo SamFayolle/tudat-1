@@ -31,9 +31,9 @@ using namespace ephemerides;
 std::shared_ptr< basic_astrodynamics::MaxwellGravityDeformationModel >
 createMaxwellGravityFieldDeformationModel(
         const std::shared_ptr< simulation_setup::Body > deformingBody,
-        const std::shared_ptr< simulation_setup::Body > perturbingBody,
+        const std::vector< std::shared_ptr< simulation_setup::Body > > perturbingBody,
         const std::string& nameOfDeformingBody,
-        const std::string& nameOfPerturbingBody,
+        const std::vector< std::string >& nameOfPerturbingBody,
         const std::shared_ptr< GravityDeformationSettings > deformationSettings ) 
 { 
     // Declare pointer to return object
@@ -45,8 +45,8 @@ createMaxwellGravityFieldDeformationModel(
     if( maxwellDeformationSettings == nullptr )
     {
         throw std::runtime_error( 
-            std::string( "Error, deformation settings inconsistent ") + " making maxwell gravity deformation of " 
-            + nameOfDeformingBody + " due to " + nameOfPerturbingBody );
+            std::string( "Error, deformation settings inconsistent ") + " when making maxwell gravity deformation of " 
+            + nameOfDeformingBody );
     }
     else
     {
@@ -70,13 +70,21 @@ createMaxwellGravityFieldDeformationModel(
             }
 
             // Create gravity deformation object.
+            std::vector< double > gravitationalParametePerturbingBodies;
+            std::vector< basic_astrodynamics::MaxwellGravityDeformationModel::StateFunction > stateFunctionPerturbingBodies;
+            for ( unsigned int k = 0 ; k < perturbingBody.size( ) ; k++ )
+            {
+                gravitationalParametePerturbingBodies.push_back( perturbingBody.at( k )->getGravitationalParameter( ) );
+                stateFunctionPerturbingBodies.push_back( std::bind( &Body::getStateByReference, perturbingBody.at( k ), std::placeholders::_1 ) );
+            }
+
             deformationModel = std::make_shared< MaxwellGravityDeformationModel >(
                     std::bind( &Body::getStateByReference, deformingBody, std::placeholders::_1 ),
                     nameOfPerturbingBody,
                     maxwellDeformationSettings->maxwellRelaxationTime_,
                     maxwellDeformationSettings->globalRelaxationTime_,
                     sphericalHarmonicsGravityField->getGravitationalParameter( ),
-                    perturbingBody->getGravitationalParameter( ),
+                    gravitationalParametePerturbingBodies, // perturbingBody->getGravitationalParameter( ),
                     sphericalHarmonicsGravityField->getReferenceRadius( ),
                     std::bind( &Body::getCurrentAngularVelocityVectorInLocalFrame, deformingBody ),
                     std::bind( &Body::getCurrentAngularVelocityDerivativeVectorInLocalFrame, deformingBody ),
@@ -89,7 +97,7 @@ createMaxwellGravityFieldDeformationModel(
                                 sphericalHarmonicsGravityField,
                                 maxwellDeformationSettings->maximumDegree_,
                                 maxwellDeformationSettings->maximumOrder_ ),
-                    std::bind( &Body::getStateByReference, perturbingBody, std::placeholders::_1 ),
+                    stateFunctionPerturbingBodies, //std::bind( &Body::getStateByReference, perturbingBody, std::placeholders::_1 ),
                     std::bind( &Body::getCurrentRotationToGlobalFrame, deformingBody ),
                     std::bind( &Body::getCurrentRotationMatrixDerivativeToLocalFrame, deformingBody ),
                     maxwellDeformationSettings->staticCoefficients_,
@@ -240,9 +248,16 @@ basic_astrodynamics::GravityDeformationModelMap createGravityDeformationModelsMa
             {
                 std::shared_ptr< MaxwellDeformationSettings > maxwellDeformationSettings = std::dynamic_pointer_cast< MaxwellDeformationSettings >( settingsIterator->second.at( i ) );
                 std::string deformingBody = settingsIterator->first;
-                std::string perturbingBody = maxwellDeformationSettings->perturbingBody_;
-                gravityDeformationModels[ settingsIterator->first ].push_back( createMaxwellGravityFieldDeformationModel( bodies.at( deformingBody ), bodies.at( perturbingBody ),
-                deformingBody, perturbingBody, settingsIterator->second.at( i ) ) );
+
+                std::vector< std::string > perturbingBodyNames = maxwellDeformationSettings->perturbingBody_;
+                std::vector< std::shared_ptr< simulation_setup::Body > > perturbingBodies;
+                for ( unsigned int k = 0 ; k < perturbingBodyNames.size( ) ; k++ )
+                {
+                    perturbingBodies.push_back( bodies.at( perturbingBodyNames.at( k ) ) );
+                }
+
+                gravityDeformationModels[ settingsIterator->first ].push_back( createMaxwellGravityFieldDeformationModel( bodies.at( deformingBody ), perturbingBodies,
+                deformingBody, perturbingBodyNames, settingsIterator->second.at( i ) ) );
                 break;
             }
             default:

@@ -44,9 +44,9 @@ using namespace ephemerides;
 std::shared_ptr< basic_astrodynamics::MaxwellGravityDeformationModel >
 createMaxwellGravityFieldDeformationModel(
         const std::shared_ptr< simulation_setup::Body > deformingBody,
-        const std::shared_ptr< simulation_setup::Body > perturbingBody,
+        const std::vector< std::shared_ptr< simulation_setup::Body > > perturbingBody,
         const std::string& nameOfDeformingBody,
-        const std::string& nameOfPerturbingBody,
+        const std::vector< std::string >& nameOfPerturbingBody,
         const std::shared_ptr< GravityDeformationSettings > deformationSettings ); 
 
 basic_astrodynamics::GravityDeformationModelMap createGravityDeformationModelsMap(
