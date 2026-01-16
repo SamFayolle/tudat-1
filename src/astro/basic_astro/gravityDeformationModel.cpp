@@ -28,6 +28,9 @@ void MaxwellGravityDeformationModel::updateMembers( const double currentTime )
         // std::cout << "in updateMembers -- " << std::endl;
         // std::cout << "currentTime " << currentTime << std::endl;
 
+        // Update gravitational parameters ratio
+        gravitationalParametersRatio_ = gravitationalParameterPerturbingBody_[ 0 ]( ) / gravitationalParameterDeformingBody_( ); // TO BE MODIFIED - FOR NOW SET TO INDEX 0
+
         // Update gravity coefficients
         cosineHarmonicCoefficients = getCosineHarmonicsCoefficients( );
         sineHarmonicCoefficients = getSineHarmonicsCoefficients( );
@@ -73,6 +76,7 @@ void MaxwellGravityDeformationModel::updateMembers( const double currentTime )
         // std::cout << "currentInertialRelativeState_ " << currentInertialRelativeState_.transpose( ) << std::endl;
 
         Eigen::Matrix3d currentRotationToLocalFrameDerivative = rotationToBodyFixedDerivativeFunction_( );
+        currentRotationToLocalFrameDerivative_ = currentRotationToLocalFrameDerivative;
         // std::cout << "currentRotationToLocalFrameDerivative " << std::endl;
         // std::cout << currentRotationToLocalFrameDerivative << std::endl;
 
@@ -121,11 +125,6 @@ void MaxwellGravityDeformationModel::updateMembers( const double currentTime )
         }
         
 
-        //  if (negativeSignLatitude_)
-        //  {
-        //     currentLatitudeDerivative_ = - currentLatitudeDerivative_;
-        //     currentLatitude_ = - currentLatitude_;
-        //  }   
         // std::cout << "in updateMembers time " << currentTime << " longitude " << currentLongitude_ << " distance " <<
             //  currentRelativePosition_.segment( 0, 3 ).norm( ) << " longitude derivative " << currentLongitudeDerivative_ << std::endl;
 
@@ -169,9 +168,21 @@ void MaxwellGravityDeformationModel::updateEquilibriumDeformation( const double 
     equilibriumCoefficients_ = Eigen::VectorXd::Zero( 5 ); 
     derivativeEquilibriumCoefficients_ = Eigen::VectorXd::Zero( 5 );
 
+    currentAngularVelocityDeformingBody_ = angularVelocityDeformingBody_( );
+    currentAngularVelocityDerivativeDeformingBody_ = angularVelocityDerivativeDeformingBody_( );
+
     double rotationRate = angularVelocityDeformingBody_( ).norm( );
-    double rotationRateDerivative = angularVelocityDerivativeDeformingBody_( )[ 2 ]; // SHOULD BE MODIFIED
-    // std::cout << "rotationRateDerivative " << rotationRateDerivative << std::endl;
+    double rotationRateDerivative = 0.0;
+    if ( rotationRate > 0.0 )
+    {
+        rotationRateDerivative = ( angularVelocityDeformingBody_( )[ 0 ] * angularVelocityDerivativeDeformingBody_( )[ 0 ] 
+        + angularVelocityDeformingBody_( )[ 1 ] * angularVelocityDerivativeDeformingBody_( )[ 1 ] 
+        + angularVelocityDeformingBody_( )[ 2 ] * angularVelocityDerivativeDeformingBody_( )[ 2 ] ) / rotationRate;
+    }
+    //  angularVelocityDerivativeDeformingBody_( )[ 2 ]; // SHOULD BE MODIFIED
+    // std::cout << "rotationRateDerivative " << rotationRateDerivative << " vs " << angularVelocityDerivativeDeformingBody_( )[ 2 ] << std::endl;
+
+
 
     for ( unsigned int k = 0 ; k < perturbingBody_.size( ) ; k++ )
     {
@@ -182,7 +193,8 @@ void MaxwellGravityDeformationModel::updateEquilibriumDeformation( const double 
         // std::cout << "radiusRatioPowerThree " << radiusRatioPowerThree << std::endl;
         // std::cout << "currentLongitude_ " << currentLongitude_ << std::endl;
 
-        double gravitationalParametersRatio = gravitationalParameterPerturbingBody_.at( k ) / gravitationalParameterDeformingBody_ ;
+        double gravitationalParametersRatio = gravitationalParameterPerturbingBody_.at( k )( ) / gravitationalParameterDeformingBody_( );
+        double gravitationalParameterDeformingBody = gravitationalParameterDeformingBody_( );
         // // std::cout << "gravitationalParametersRatio " << gravitationalParametersRatio << std::endl;
 
         // std::cout << "in update equilibrium " << currentTime << std::endl;
@@ -210,6 +222,12 @@ void MaxwellGravityDeformationModel::updateEquilibriumDeformation( const double 
             //     / ( 3.0 * gravitationalParameterDeformingBody_ ) 
             + 0.5 * gravitationalParametersRatio * radiusRatioPowerThree 
             * ( 3.0 * std::sin( currentLatitude_.at( k ) ) * std::sin( currentLatitude_.at( k ) ) - 1.0 ) ); 
+        if ( includeCentrifugalPotential_ )
+        {
+            equilibriumCoefficients_[ 0 ] += - k2_ * rotationRate * rotationRate * referenceRadius_* referenceRadius_ * referenceRadius_ 
+                / ( 3.0 * gravitationalParameterDeformingBody ); 
+        }    
+
         equilibriumCoefficients_[ 2 ] += k2_ / 4.0 * gravitationalParametersRatio * radiusRatioPowerThree * 
             ( 1.0 - std::sin( currentLatitude_.at( k ) ) * std::sin( currentLatitude_.at( k ) ) ) * std::cos( 2.0 * currentLongitude_.at( k ) );
         equilibriumCoefficients_[ 4 ] += k2_ / 4.0 * gravitationalParametersRatio * radiusRatioPowerThree * 
@@ -236,12 +254,20 @@ void MaxwellGravityDeformationModel::updateEquilibriumDeformation( const double 
             + currentRelativePosition_.at( k )[ 1 ] * currentRelativeVelocity_.at( k )[ 1 ] 
             + currentRelativePosition_.at( k )[ 2 ] * currentRelativeVelocity_.at( k )[ 2 ] ) / relativeDistance;
 
+        currentDistance_.at( k ) = relativeDistance;    
+        currentDistanceDerivative_.at( k ) = currentDistanceDerivative;    
+
         derivativeEquilibriumCoefficients_[ 0 ] += - k2_ * ( 
             //2.0 * rotationRate * referenceRadius_ * referenceRadius_ * referenceRadius_ / ( 3.0 * gravitationalParameterDeformingBody_ ) * rotationRateDerivative
             + 1.0 / 2.0 * gravitationalParametersRatio * radiusRatioPowerThree 
             * 3.0 * currentDistanceDerivative / relativeDistance * ( 3.0 * std::sin( currentLatitude_.at( k ) ) * std::sin( currentLatitude_.at( k ) ) - 1.0 )
             - 1.0 / 2.0 * gravitationalParametersRatio * radiusRatioPowerThree 
-            * ( 6.0 * currentLatitudeDerivative_.at( k ) * std::sin( currentLatitude_.at( k ) ) * std::cos( currentLatitude_.at( k ) ) )  );
+            * ( 6.0 * currentLatitudeDerivative_.at( k ) * std::sin( currentLatitude_.at( k ) ) * std::cos( currentLatitude_.at( k ) ) ) );
+        if ( includeCentrifugalPotential_ )
+        {
+            derivativeEquilibriumCoefficients_[ 0 ] += - 2.0 * k2_ * rotationRate * rotationRateDerivative * referenceRadius_ * referenceRadius_ * referenceRadius_ 
+                / ( 3.0 * gravitationalParameterDeformingBody );
+        }
 
         derivativeEquilibriumCoefficients_[ 2 ] += - k2_ / 4.0 * gravitationalParametersRatio * radiusRatioPowerThree * (
             3.0 * currentDistanceDerivative / relativeDistance 
@@ -272,12 +298,7 @@ void MaxwellGravityDeformationModel::updateEquilibriumDeformation( const double 
             - currentLatitudeDerivative_.at( k ) * 
             ( std::cos( currentLatitude_.at( k ) ) * std::cos( currentLatitude_.at( k ) ) - std::sin( currentLatitude_.at( k ) ) * std::sin( currentLatitude_.at( k ) ) ) 
             * std::sin( currentLongitude_.at( k ) ) );
-
-            // if (negativeSignLatitude_)
-            // {
-            //     derivativeEquilibriumCoefficients_[ 1 ] = - derivativeEquilibriumCoefficients_[ 1 ];
-            //     derivativeEquilibriumCoefficients_[ 3 ] = - derivativeEquilibriumCoefficients_[ 3 ];
-            // }
+        
         }
     }
 
@@ -285,6 +306,16 @@ void MaxwellGravityDeformationModel::updateEquilibriumDeformation( const double 
 
     // std::cout << "equilibriumCoefficients_ " << equilibriumCoefficients_.transpose( ) << std::endl;
     // std::cout << "derivativeEquilibriumCoefficients_ " << derivativeEquilibriumCoefficients_.transpose( ) << std::endl;
+}
+
+//! Update the members of a gravity deformation model and evaluate the deformatopn.
+Eigen::Vector5d updateAndGetDeformation( const std::shared_ptr< GravityDeformationModel > gravityDeformationModel, const double currentTime )
+{
+    // Update members.
+    gravityDeformationModel->updateMembers( currentTime );
+
+    // Evaluate and return deformation.
+    return gravityDeformationModel->getDeformation( );
 }
 
 } // namespace basic_astrodynamics

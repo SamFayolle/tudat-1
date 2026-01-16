@@ -65,11 +65,11 @@ MaxwellDeformationSettings(
     const std::vector< std::string > perturbingBody,
     const Eigen::VectorXd staticCoefficients = Eigen::VectorXd::Zero( 5 ),
     const bool includeOrder1 = true,
-    const bool negativeSignLatitude = false ):
+    const bool includeCentrifugalPotential = false ):
     GravityDeformationSettings( basic_astrodynamics::maxwell_deformation ), maxwellRelaxationTime_( maxwellRelaxationTime ),
     globalRelaxationTime_( globalRelaxationTime ), loveNumber_( loveNumber ), 
     maximumDegree_( maximumDegree ), maximumOrder_( maximumOrder ), perturbingBody_( perturbingBody ), 
-    staticCoefficients_( staticCoefficients ), includeOrder1_( includeOrder1 ), negativeSignLatitude_(negativeSignLatitude)
+    staticCoefficients_( staticCoefficients ), includeOrder1_( includeOrder1 ), includeCentrifugalPotential_( includeCentrifugalPotential )
     {
 
     }
@@ -85,7 +85,7 @@ const int maximumOrder_;
 const std::vector< std::string > perturbingBody_;
 Eigen::VectorXd staticCoefficients_;
 const bool includeOrder1_;
-const bool negativeSignLatitude_;
+const bool includeCentrifugalPotential_;
 
 };
 
@@ -100,11 +100,11 @@ inline std::shared_ptr< GravityDeformationSettings > maxwellDeformationSettings(
     const std::string perturbingBody,
     const Eigen::VectorXd staticCoefficients = Eigen::VectorXd::Zero( 5 ),
     const bool includeOrder1 = true,
-    const bool negativeSignLatitude = false )
+    const bool includeCentrifugalPotential = false )
 {
     std::vector< std::string > perturbingBodies = { perturbingBody };
     return std::make_shared< MaxwellDeformationSettings >( maxwellRelaxationTime, globalRelaxationTime, loveNumber,
-        maximumDegree, maximumOrder, perturbingBodies, staticCoefficients, includeOrder1, negativeSignLatitude );
+        maximumDegree, maximumOrder, perturbingBodies, staticCoefficients, includeOrder1, includeCentrifugalPotential );
 }
 
 inline std::shared_ptr< GravityDeformationSettings > maxwellDeformationSettings(
@@ -116,10 +116,10 @@ inline std::shared_ptr< GravityDeformationSettings > maxwellDeformationSettings(
     const std::vector< std::string > perturbingBodies,
     const Eigen::VectorXd staticCoefficients = Eigen::VectorXd::Zero( 5 ),
     const bool includeOrder1 = true,
-    const bool negativeSignLatitude = false )
+    const bool includeCentrifugalPotential = false )
 {
     return std::make_shared< MaxwellDeformationSettings >( maxwellRelaxationTime, globalRelaxationTime, loveNumber,
-        maximumDegree, maximumOrder, perturbingBodies, staticCoefficients, includeOrder1, negativeSignLatitude );
+        maximumDegree, maximumOrder, perturbingBodies, staticCoefficients, includeOrder1, includeCentrifugalPotential );
 }
 
 

@@ -70,21 +70,24 @@ createMaxwellGravityFieldDeformationModel(
             }
 
             // Create gravity deformation object.
-            std::vector< double > gravitationalParametePerturbingBodies;
+            std::vector< std::function< double( ) > > gravitationalParameterFunctionPerturbingBodies;
             std::vector< basic_astrodynamics::MaxwellGravityDeformationModel::StateFunction > stateFunctionPerturbingBodies;
             for ( unsigned int k = 0 ; k < perturbingBody.size( ) ; k++ )
             {
-                gravitationalParametePerturbingBodies.push_back( perturbingBody.at( k )->getGravitationalParameter( ) );
+                gravitationalParameterFunctionPerturbingBodies.push_back( 
+                    std::bind( &gravitation::GravityFieldModel::getGravitationalParameter, perturbingBody.at( k )->getGravityFieldModel( ) ) );
                 stateFunctionPerturbingBodies.push_back( std::bind( &Body::getStateByReference, perturbingBody.at( k ), std::placeholders::_1 ) );
             }
+            std::function< double( ) > gravitationalParameterFunctionDeformingBody =
+                        std::bind( &gravitation::GravityFieldModel::getGravitationalParameter, sphericalHarmonicsGravityField );
 
             deformationModel = std::make_shared< MaxwellGravityDeformationModel >(
                     std::bind( &Body::getStateByReference, deformingBody, std::placeholders::_1 ),
                     nameOfPerturbingBody,
                     maxwellDeformationSettings->maxwellRelaxationTime_,
                     maxwellDeformationSettings->globalRelaxationTime_,
-                    sphericalHarmonicsGravityField->getGravitationalParameter( ),
-                    gravitationalParametePerturbingBodies, // perturbingBody->getGravitationalParameter( ),
+                    gravitationalParameterFunctionDeformingBody,
+                    gravitationalParameterFunctionPerturbingBodies, // perturbingBody->getGravitationalParameter( ),
                     sphericalHarmonicsGravityField->getReferenceRadius( ),
                     std::bind( &Body::getCurrentAngularVelocityVectorInLocalFrame, deformingBody ),
                     std::bind( &Body::getCurrentAngularVelocityDerivativeVectorInLocalFrame, deformingBody ),
@@ -102,7 +105,7 @@ createMaxwellGravityFieldDeformationModel(
                     std::bind( &Body::getCurrentRotationMatrixDerivativeToLocalFrame, deformingBody ),
                     maxwellDeformationSettings->staticCoefficients_,
                     maxwellDeformationSettings->includeOrder1_,
-                    maxwellDeformationSettings->negativeSignLatitude_ );
+                    maxwellDeformationSettings->includeCentrifugalPotential_ );
         }
     }
     return deformationModel;

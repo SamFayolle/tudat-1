@@ -8,6 +8,7 @@
  #    http://tudat.tudelft.nl/LICENSE.
 
  add_subdirectory("acceleration_partials")
+ add_subdirectory("gravity_deformation_partials")
  add_subdirectory("rotational_dynamics_partials")
  add_subdirectory("estimatable_parameters")
  add_subdirectory("observation_partials")

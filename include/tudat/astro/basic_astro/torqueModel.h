@@ -132,16 +132,20 @@ public:
     {
         // if( !( currentTime == currentTime_ ) )
         // {
+            Eigen::Matrix3d inertiaTensor = inertiaTensorFunction_( ); 
             // std::cout << inertiaTensorFunction_( ) << std::endl;
-            // std::cout << "inertiaTensorTimeDerivative" << std::endl;
+            // std::cout << "in inertial torque model inertiaTensorTimeDerivative" << std::endl;
             // std::cout << inertiaTensorDerivativeFunction_( ) << std::endl;
-            // std::cout << "angularVelocityFunction_( ) " << angularVelocityFunction_( ) << std::endl;
-            currentTorque_ = -angularVelocityFunction_( ).cross( inertiaTensorFunction_( ) * angularVelocityFunction_( ) )
+            // std::cout << "angularVelocityFunction_( ) " << angularVelocityFunction_( ).transpose() << std::endl;
+            currentTorque_ = -angularVelocityFunction_( ).cross( inertiaTensor * angularVelocityFunction_( ) )
                 - inertiaTensorDerivativeFunction_( ) * angularVelocityFunction_( );
             // std::cout << "inertia contribution " << 
                 // ( -angularVelocityFunction_( ).cross( inertiaTensorFunction_( ) * angularVelocityFunction_( ) ) ).transpose( ) << std::endl;
             // std::cout << "inertia derivative contribution " << 
                 // ( - inertiaTensorDerivativeFunction_( ) * angularVelocityFunction_( ) ).transpose( ) << std::endl;
+            // std::cout << "currentTorque_ I " << currentTorque_.transpose() << std::endl;
+            
+            // std::cout << "currentTorque_ 2 " << (-angularVelocityFunction_( ).cross( inertiaTensor * angularVelocityFunction_( ) )).transpose() << std::endl;
             currentTime_ = currentTime;
         // }
     }

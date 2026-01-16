@@ -974,7 +974,7 @@ public:
      */
     SynchronousRotationMatrixPartialWrtTranslationalState(
             const std::shared_ptr< ephemerides::SynchronousRotationalEphemeris > synchronousRotationaModel ):
-        RotationMatrixPartial( synchronousRotationaModel ), synchronousRotationaModel_( synchronousRotationaModel )
+        RotationMatrixPartial( synchronousRotationaModel ), synchronousRotationaModel_( synchronousRotationaModel ), warningPrinted_( false )
     {
         directLongitudeLibrationCalculator_ = std::dynamic_pointer_cast< ephemerides::DirectLongitudeLibrationCalculator >(
                 synchronousRotationaModel->getLongitudeLibrationCalculator( ) );
@@ -996,16 +996,24 @@ public:
     //! Function to compute the required partial derivative of rotation matrix derivative.
     /*!
      * Function to compute the partial derivative of derivative of rotation matrix from a body-fixed to inertial frame w.r.t.
-     * the rotational state vector. NOTE: function not yet implemented
+     * the translational state vector. NOTE: function not yet implemented
      * \param time Time at which partials are to be computed
-     * \return Vector of size 7 containing partials of rotation matrix derivative from body-fixed to inertial frame w.r.t. the
-     * rotational state vector
+     * \return Vector of size 6 containing partials of rotation matrix derivative from body-fixed to inertial frame w.r.t. the
+     * translational state vector
      */
     std::vector< Eigen::Matrix3d > calculatePartialOfRotationMatrixDerivativeToBaseFrameWrParameter( const double time )
-    {
-        throw std::runtime_error(
-                "Error when calling RotationMatrixPartialWrtQuaternion::calculatePartialOfRotationMatrixDerivativeToBaseFrameWrParameter, "
-                "function not yet implemented." );
+    {   
+        if( !warningPrinted_ )
+        {
+            std::cerr << "Warning, time-derivative of synchronous rotation matrix not yet implemented (using zero matrix), the partials wrt translational state return zero" << std::endl;
+            warningPrinted_ = true;
+        }
+        std::vector< Eigen::Matrix3d > zeroPartialsWrtTranslationalState;
+        for ( unsigned int i = 0 ; i < 6 ; i++ )
+        {
+            zeroPartialsWrtTranslationalState.push_back( Eigen::Matrix3d::Zero( ) );
+        }
+        return zeroPartialsWrtTranslationalState;
     }
 
 private:
@@ -1013,6 +1021,9 @@ private:
     std::shared_ptr< ephemerides::SynchronousRotationalEphemeris > synchronousRotationaModel_;
 
     std::shared_ptr< ephemerides::DirectLongitudeLibrationCalculator > directLongitudeLibrationCalculator_;
+
+    //!  Boolean defining whether the warning for the partials of the rotation matrix time-derivative has been printed.
+    bool warningPrinted_;
 };
 
 //! Typedef of list of RotationMatrixPartial objects, ordered by parameter.

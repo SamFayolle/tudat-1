@@ -131,6 +131,7 @@ std::shared_ptr< acceleration_partials::TorquePartial > createAnalyticalTorquePa
             std::function< Eigen::Vector3d( ) > angularVelocityFunction =
                     std::bind( &Body::getCurrentAngularVelocityVectorInLocalFrame, acceleratedBody.second );
             std::function< Eigen::Matrix3d( ) > inertiaTensorFunction = std::bind( &Body::getBodyInertiaTensor, acceleratedBody.second );
+            std::function< Eigen::Matrix3d( ) > inertiaTensorDerivativeFunction = std::bind( &Body::getBodyInertiaTensorDerivative, acceleratedBody.second );
 
             std::function< double( ) > gravitationalParameterFunction;
             if( acceleratedBody.second->getGravityFieldModel( ) != nullptr )
@@ -151,6 +152,7 @@ std::shared_ptr< acceleration_partials::TorquePartial > createAnalyticalTorquePa
 
             torquePartial = std::make_shared< acceleration_partials::InertialTorquePartial >( angularVelocityFunction,
                                                                                               inertiaTensorFunction,
+                                                                                              inertiaTensorDerivativeFunction,
                                                                                               inertiaTensorNormalizationFunction,
                                                                                               gravitationalParameterFunction,
                                                                                               acceleratedBody.first );

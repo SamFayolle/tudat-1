@@ -128,6 +128,10 @@ public:
         {
             isStateDerivativeDependent = true;
         }
+        if( stateReferencePoint.first == bodyUndergoingTorque_ && integratedStateType == propagators::gravity_deformation_state )
+        {
+            isStateDerivativeDependent = true;
+        }
         else if( ( ( stateReferencePoint.first == bodyUndergoingTorque_ || ( stateReferencePoint.first == bodyExertingTorque_ ) ) &&
                    integratedStateType == propagators::body_mass_state ) )
         {
@@ -188,6 +192,8 @@ protected:
     void wrtSineSphericalHarmonicCoefficientsOfCentralBody( Eigen::MatrixXd& sphericalHarmonicCoefficientPartial,
                                                             const int s21Index,
                                                             const int s22Index );
+
+    void wrtGravityDeformation( Eigen::Block< Eigen::MatrixXd >& deformationPartial );
 
     std::shared_ptr< gravitation::SecondDegreeGravitationalTorqueModel > torqueModel_;
 

@@ -677,6 +677,34 @@ void SphericalHarmonicsGravityPartial::wrtRotationModelParameter( Eigen::MatrixX
     }
 }
 
+void SphericalHarmonicsGravityPartial::wrtGravityDeformation( Eigen::MatrixXd& accelerationPartial )
+{
+    std::vector< std::pair< int, int > > cosineIndices;
+    cosineIndices.push_back( std::make_pair( 2, 0 ) );
+    cosineIndices.push_back( std::make_pair( 2, 1 ) );
+    cosineIndices.push_back( std::make_pair( 2, 2 ) );
+
+    std::vector< std::pair< int, int > > sineIndices;
+    sineIndices.push_back( std::make_pair( 2, 1 ) );
+    sineIndices.push_back( std::make_pair( 2, 2 ) );
+
+    Eigen::MatrixXd cosinePartialDerivatives = Eigen::MatrixXd::Zero( 3, 3 );
+    Eigen::MatrixXd sinePartialDerivatives = Eigen::MatrixXd::Zero( 3, 2 );
+    
+    wrtCosineCoefficientBlock( cosineIndices, cosinePartialDerivatives );
+    wrtSineCoefficientBlock( sineIndices, sinePartialDerivatives );
+
+    cosinePartialDerivatives.block(0, 0, 3, 1) /= basic_mathematics::calculateLegendreGeodesyNormalizationFactor( 2, 0 );
+    cosinePartialDerivatives.block(0, 1, 3, 1) /= basic_mathematics::calculateLegendreGeodesyNormalizationFactor( 2, 1 );
+    cosinePartialDerivatives.block(0, 2, 3, 1) /= basic_mathematics::calculateLegendreGeodesyNormalizationFactor( 2, 2 );
+
+    sinePartialDerivatives.block(0, 0, 3, 1) /= basic_mathematics::calculateLegendreGeodesyNormalizationFactor( 2, 1 );
+    sinePartialDerivatives.block(0, 1, 3, 1) /= basic_mathematics::calculateLegendreGeodesyNormalizationFactor( 2, 2 );
+
+    accelerationPartial.block( 0, 0, 3, 3 ) = cosinePartialDerivatives;
+    accelerationPartial.block( 0, 3, 3, 2 ) = sinePartialDerivatives;
+}
+
 //! Function to calculate an acceleration partial wrt a tidal parameter.
 void SphericalHarmonicsGravityPartial::wrtTidalModelParameter(
         const std::function< std::vector< Eigen::Matrix< double, 2, Eigen::Dynamic > >( ) > coefficientPartialFunctions,

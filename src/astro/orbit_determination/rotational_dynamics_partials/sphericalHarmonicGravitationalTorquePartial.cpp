@@ -99,6 +99,13 @@ void SphericalHarmonicGravitationalTorquePartial::wrtNonRotationalStateOfAdditio
                         accelerationPartial_->getCurrentPartialWrtPosition( ) -
                 currentBodyFixedPotentialGradientCrossProductMatrix_ * currentRotationToBodyFixedFrame_;
     }
+    if( stateReferencePoint.first == bodyUndergoingTorque_  && integratedStateType == propagators::gravity_deformation_state )
+    {
+        Eigen::MatrixXd accelerationPartialWrtGravityState = Eigen::MatrixXd::Zero( 3, 5 );
+        accelerationPartial_->wrtNonTranslationalStateOfAdditionalBody( accelerationPartialWrtGravityState.block( 0, 0, 3, 5 ), stateReferencePoint, integratedStateType, true ); 
+        partialMatrix.block( 0, 0, 3, 5 ) += currentBodyFixedRelativePositionCrossProductMatrix_ * currentRotationToBodyFixedFrame_ * accelerationPartialWrtGravityState;
+        // wrtGravityDeformation( partialMatrix );
+    }
 }
 
 //! Update partial model to current time

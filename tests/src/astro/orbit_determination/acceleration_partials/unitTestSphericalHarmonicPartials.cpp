@@ -709,6 +709,7 @@ BOOST_AUTO_TEST_CASE( testSphericalHarmonicAccelerationPartial )
     // Declare numerical partials.
     Eigen::Matrix3d testPartialWrtEarthPosition = Eigen::Matrix3d::Zero( );
     Eigen::Matrix3d testPartialWrtEarthVelocity = Eigen::Matrix3d::Zero( );
+    Eigen::MatrixXd testPartialWrtEarthGravityDeformation = Eigen::MatrixXd::Zero( 3, 5 );
     Eigen::Matrix3d testPartialWrtVehiclePosition = Eigen::Matrix3d::Zero( );
     Eigen::Matrix3d testPartialWrtVehicleVelocity = Eigen::Matrix3d::Zero( );
 
@@ -717,12 +718,16 @@ BOOST_AUTO_TEST_CASE( testSphericalHarmonicAccelerationPartial )
     positionPerturbation << 10.0, 10.0, 10.0;
     Eigen::Vector3d velocityPerturbation;
     velocityPerturbation << 1.0E-3, 1.0E-3, 1.0E-3;
+    Eigen::Vector5d gravityDeformationPerturbation;
+    gravityDeformationPerturbation << 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6;
 
     // Create state access/modification functions for bodies.
     std::function< void( Eigen::Vector6d ) > earthStateSetFunction = std::bind( &Body::setState, earth, std::placeholders::_1 );
     std::function< void( Eigen::Vector6d ) > vehicleStateSetFunction = std::bind( &Body::setState, vehicle, std::placeholders::_1 );
     std::function< Eigen::Vector6d( ) > earthStateGetFunction = std::bind( &Body::getState, earth );
     std::function< Eigen::Vector6d( ) > vehicleStateGetFunction = std::bind( &Body::getState, vehicle );
+    std::function< void( Eigen::VectorXd ) > earthGravityDeformationSetFunction = 
+        std::bind( &Body::setCurrentPropagatedGravityField, earth, std::placeholders::_1 ); 
 
     std::vector< std::shared_ptr< EstimatableParameterSettings > > parameterNames;
     parameterNames.push_back(
@@ -867,6 +872,9 @@ BOOST_AUTO_TEST_CASE( testSphericalHarmonicAccelerationPartial )
     Eigen::MatrixXd partialWrtEarthOrientation = Eigen::MatrixXd::Zero( 3, 7 );
     accelerationPartial->wrtNonTranslationalStateOfAdditionalBody(
             partialWrtEarthOrientation.block( 0, 0, 3, 7 ), std::make_pair( "Earth", "" ), propagators::rotational_state );
+    Eigen::MatrixXd partialWrtEarthGravityDeformation = Eigen::MatrixXd::Zero( 3, 5 );
+    accelerationPartial->wrtNonTranslationalStateOfAdditionalBody(
+            partialWrtEarthGravityDeformation.block( 0, 0, 3, 5 ), std::make_pair( "Earth", "" ), propagators::gravity_deformation_state );
 
     // Calculate numerical partials.
     testPartialWrtVehiclePosition = calculateAccelerationWrtStatePartials(
@@ -878,6 +886,16 @@ BOOST_AUTO_TEST_CASE( testSphericalHarmonicAccelerationPartial )
             earthStateSetFunction, gravitationalAcceleration, earth->getState( ), positionPerturbation, 0 );
     testPartialWrtEarthVelocity = calculateAccelerationWrtStatePartials(
             earthStateSetFunction, gravitationalAcceleration, earth->getState( ), velocityPerturbation, 3 );
+    
+     // Retrieve the gravity deformation (unnormalised) that would match Earth's static gravity field coefficients (normalised)
+    Eigen::VectorXd earthGravityDeformation = Eigen::VectorXd::Zero(5);
+    earthGravityDeformation[0] = cosineCoefficients(2,0) * basic_mathematics::calculateLegendreGeodesyNormalizationFactor( 2, 0 );
+    earthGravityDeformation[1] = cosineCoefficients(2,1) * basic_mathematics::calculateLegendreGeodesyNormalizationFactor( 2, 1 );
+    earthGravityDeformation[2] = cosineCoefficients(2,2) * basic_mathematics::calculateLegendreGeodesyNormalizationFactor( 2, 2 );
+    earthGravityDeformation[3] = sineCoefficients(2,1) * basic_mathematics::calculateLegendreGeodesyNormalizationFactor( 2, 1 );
+    earthGravityDeformation[4] = sineCoefficients(2,2) * basic_mathematics::calculateLegendreGeodesyNormalizationFactor( 2, 2 );
+    testPartialWrtEarthGravityDeformation = calculateAccelerationWrtGravityDeformationStatePartials(
+            earthGravityDeformationSetFunction, gravitationalAcceleration, earthGravityDeformation, gravityDeformationPerturbation, 0 );
 
     Eigen::Vector4d orientationPerturbation;
     orientationPerturbation << 1.0E-8, 1.0E-8, 1.0E-8, 1.0E-8;
@@ -1002,6 +1020,7 @@ BOOST_AUTO_TEST_CASE( testSphericalHarmonicAccelerationPartial )
     TUDAT_CHECK_MATRIX_CLOSE_FRACTION( testPartialWrtVehicleVelocity, partialWrtVehicleVelocity, 1.0E-6 );
     TUDAT_CHECK_MATRIX_CLOSE_FRACTION( testPartialWrtEarthPosition, partialWrtEarthPosition, 1.0E-6 );
     TUDAT_CHECK_MATRIX_CLOSE_FRACTION( testPartialWrtEarthVelocity, partialWrtEarthVelocity, 1.0E-6 );
+    TUDAT_CHECK_MATRIX_CLOSE_FRACTION( testPartialWrtEarthGravityDeformation, partialWrtEarthGravityDeformation, 1.0E-6 );
 
     //    // Compare numerical and analytical results.
     for( int index = 1; index < 4; index++ )

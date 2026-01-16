@@ -134,6 +134,23 @@ public:
                                                       1 );
                 }
             }
+            case propagators::gravity_deformation_state:
+            {
+                // Check if reference id is consistent.
+                if( stateReferencePoint.second != "" )
+                {
+                    throw std::runtime_error( "Error when getting torque partial, cannot have reference point on body for body gravity deformation" );
+                }
+                else if( isStateDerivativeDependentOnIntegratedAdditionalStateTypes( stateReferencePoint, integratedStateType ) )
+                {
+                    partialFunction = std::make_pair( std::bind( &TorquePartial::wrtNonRotationalStateOfAdditionalBody,
+                                                                 this,
+                                                                 std::placeholders::_1,
+                                                                 stateReferencePoint,
+                                                                 integratedStateType ), 5 );
+                }
+                break;
+            }
             case propagators::custom_state: {
                 break;
             }

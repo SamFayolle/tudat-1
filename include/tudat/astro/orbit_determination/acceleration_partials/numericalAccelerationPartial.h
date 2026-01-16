@@ -63,6 +63,15 @@ Eigen::Matrix3d calculateAccelerationWrtStatePartials(
         std::function< void( ) > updateFunction = emptyFunction,
         const double evaluationTime = TUDAT_NAN );
 
+Eigen::MatrixXd calculateAccelerationWrtGravityDeformationStatePartials(
+        std::function< void( Eigen::VectorXd ) > setGravityState,
+        std::shared_ptr< basic_astrodynamics::AccelerationModel< Eigen::Vector3d > > accelerationModel,
+        Eigen::VectorXd originalState,
+        Eigen::VectorXd statePerturbation,
+        int startIndex,
+        std::function< void( ) > updateFunction = emptyFunction,
+        const double evaluationTime = TUDAT_NAN );
+
 Eigen::Vector3d calculateAccelerationWrtMassPartials(
         std::function< void( double ) > setBodyMass,
         std::shared_ptr< basic_astrodynamics::AccelerationModel< Eigen::Vector3d > > accelerationModel,
@@ -138,6 +147,14 @@ Eigen::MatrixXd calculateTorqueWrtTranslationalStatePartials( std::function< voi
                                                               int startIndex,
                                                               std::function< void( ) > updateFunction = emptyFunction,
                                                               const double evaluationTime = TUDAT_NAN );
+
+Eigen::MatrixXd calculateTorqueWrtGravityDeformationStatePartials( std::function< void( Eigen::VectorXd ) > setBodyState,
+                                                                   std::shared_ptr< basic_astrodynamics::TorqueModel > torqueModel,
+                                                                   Eigen::VectorXd originalState,
+                                                                   Eigen::VectorXd statePerturbation,
+                                                                   int startIndex,
+                                                                   std::function< void( ) > updateFunction = emptyFunction,
+                                                                   const double evaluationTime = TUDAT_NAN );
 
 //! Function to numerical compute the partial derivative of a torque w.r.t. a body rotational quaternion.
 /*!
@@ -255,6 +272,114 @@ Eigen::Matrix< double, 3, Eigen::Dynamic > calculateTorqueWrtParameterPartials(
         std::function< void( ) > updateDependentVariables = emptyFunction,
         const double currentTime = 0.0,
         std::function< void( const double ) > timeDependentUpdateDependentVariables = emptyTimeFunction );
+
+//! Function to numerical compute the partial derivative of a gravity deformation w.r.t. a double parameter
+Eigen::Vector5d calculateDeformationWrtParameterPartials( 
+        std::shared_ptr< estimatable_parameters::EstimatableParameter< double > > parameter,
+        std::shared_ptr< basic_astrodynamics::GravityDeformationModel > deformationModel,
+        double parameterPerturbation,
+        std::function< void( ) > updateDependentVariables = emptyFunction,
+        const double currentTime = 0.0,
+        std::function< void( const double ) > timeDependentUpdateDependentVariables = emptyTimeFunction );
+
+Eigen::Matrix< double, 5, Eigen::Dynamic > calculateDeformationWrtParameterPartials(
+        std::shared_ptr< estimatable_parameters::EstimatableParameter< Eigen::VectorXd > > parameter,
+        std::shared_ptr< basic_astrodynamics::GravityDeformationModel > deformationModel,
+        Eigen::VectorXd parameterPerturbation,
+        std::function< void( ) > updateDependentVariables = emptyFunction,
+        const double currentTime = 0.0,
+        std::function< void( const double ) > timeDependentUpdateDependentVariables = emptyTimeFunction );
+
+Eigen::Matrix< double, 5, 5 > calculateDeformationWrtGravityDeformationStatePartials( 
+        std::function< void( Eigen::Vector5d ) > setBodyState,
+        std::shared_ptr< basic_astrodynamics::GravityDeformationModel > deformationModel,
+        Eigen::Vector5d originalState,
+        Eigen::Vector5d statePerturbation,
+        int startIndex,
+        std::function< void( ) > updateFunction = emptyFunction,
+        const double evaluationTime = TUDAT_NAN );
+
+//! Function to numerical compute the partial derivative of a deformation w.r.t. a body rotational state.
+Eigen::MatrixXd calculateDeformationWrtRotationalStatePartials( std::function< void( Eigen::Vector7d ) > setBodyRotationalState,
+                                                                std::shared_ptr< basic_astrodynamics::GravityDeformationModel > deformationModel,
+                                                                Eigen::Vector7d originalRotationalState,
+                                                                Eigen::VectorXd statePerturbations,
+                                                                int startIndex,
+                                                                int numberOfEntries,
+                                                                std::function< void( ) > updateFunction = emptyFunction,
+                                                                const double evaluationTime = TUDAT_NAN );
+                                                                
+//! Function to numerical compute the partial derivative of a deformation w.r.t. a body translational state.
+Eigen::MatrixXd calculateDeformationWrtTranslationalStatePartials( std::function< void( Eigen::Vector6d ) > setBodyTranslationalState,
+                                                                std::shared_ptr< basic_astrodynamics::GravityDeformationModel > deformationModel,
+                                                                Eigen::Vector6d originalTranslationalState,
+                                                                Eigen::Vector6d statePerturbations,
+                                                                int startIndex,
+                                                                int numberOfEntries,
+                                                                std::function< void( ) > updateFunction = emptyFunction,
+                                                                const double evaluationTime = TUDAT_NAN );
+
+Eigen::MatrixXd calculateGravityDeformationDeviationDueToOrientationChange( 
+        const std::function< void( Eigen::Vector7d ) > setBodyRotationalState,
+        const std::shared_ptr< basic_astrodynamics::GravityDeformationModel > deformationModel,
+        const Eigen::Vector7d& originalRotationalState,
+        const Eigen::Vector4d& commandedQuaternionPerturbation,
+        std::vector< Eigen::Vector4d >& appliedQuaternionPerturbation,
+        std::function< void( ) > updateFunction = emptyFunction,
+         const double evaluationTime = TUDAT_NAN );
+
+//! Function to numerical compute the partial derivative of a gravity deformation model w.r.t. a body rotational quaternion.
+Eigen::MatrixXd calculateTorqueDeviationDueToGravityDerivativeDependency( 
+    const std::function< void( Eigen::VectorXd ) > setParameterFunction,
+    const std::shared_ptr< basic_astrodynamics::GravityDeformationModel > deformationModel,
+    const std::shared_ptr< basic_astrodynamics::TorqueModel > torqueModel,
+    const Eigen::VectorXd& originalParameterValue,
+    const Eigen::VectorXd& originalStateDerivativeValue,
+    Eigen::VectorXd parameterPerturbations,
+    unsigned int numberOfEntries,
+    unsigned int startIndex,
+    std::function< void( Eigen::VectorXd ) > updateStateDerivativeFunction,
+    std::function< void( ) > updateParameterFunction = emptyFunction,
+    const double evaluationTime = TUDAT_NAN );
+
+Eigen::MatrixXd calculateTorqueDeviationViaGravityDerivativeDependencyDueToOrientationChange( 
+    const std::function< void( Eigen::Vector7d ) > setBodyRotationalState,
+    const std::shared_ptr< basic_astrodynamics::GravityDeformationModel > deformationModel,
+    const std::shared_ptr< basic_astrodynamics::TorqueModel > torqueModel,
+    const Eigen::Vector7d& originalRotationalState,
+    const Eigen::Vector5d& originalStateDerivativeValue,
+    const Eigen::Vector4d& commandedQuaternionPerturbation,
+    std::vector< Eigen::Vector4d >& appliedQuaternionPerturbation,
+    std::function< void( Eigen::VectorXd ) > updateStateDerivativeFunction,
+    std::function< void( ) > updateParameterFunction = emptyFunction,
+    const double evaluationTime = TUDAT_NAN );
+
+Eigen::MatrixXd calculateDeformationDeviationDueToTorqueDependency( 
+    const std::function< void( Eigen::VectorXd ) > setParameterFunction,
+    const std::shared_ptr< basic_astrodynamics::GravityDeformationModel > deformationModel,
+    const std::shared_ptr< basic_astrodynamics::TorqueModel > torqueModel,
+    const Eigen::VectorXd& originalParameterValue,
+    const Eigen::VectorXd& originalStateDerivativeValue,
+    Eigen::VectorXd parameterPerturbations,
+    unsigned int numberOfEntries,
+    unsigned int startIndex,
+    std::function< void( Eigen::VectorXd ) > updateStateDerivativeFunction,
+    Eigen::Matrix3d inertiaTensor,
+    std::function< void( ) > updateParameterFunction = emptyFunction,
+    const double evaluationTime = TUDAT_NAN );
+
+Eigen::MatrixXd calculateDeformationDeviationViaTorqueDependencyDueToOrientationChange( 
+    const std::function< void( Eigen::Vector7d ) > setBodyRotationalState,
+    const std::shared_ptr< basic_astrodynamics::GravityDeformationModel > deformationModel,
+    const std::shared_ptr< basic_astrodynamics::TorqueModel > torqueModel,
+    const Eigen::Vector7d& originalRotationalState,
+    const Eigen::Vector5d& originalStateDerivativeValue,
+    const Eigen::Vector4d& commandedQuaternionPerturbation,
+    std::vector< Eigen::Vector4d >& appliedQuaternionPerturbation,
+    std::function< void( Eigen::VectorXd ) > updateStateDerivativeFunction,
+    Eigen::Matrix3d inertiaTensor,
+    std::function< void( ) > updateParameterFunction = emptyFunction,
+    const double evaluationTime = TUDAT_NAN );
 
 }  // namespace acceleration_partials
 

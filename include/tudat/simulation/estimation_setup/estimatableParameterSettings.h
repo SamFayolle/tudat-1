@@ -646,6 +646,43 @@ public:
     std::string baseOrientation_;
 };
 
+//! Class to define settings for estimating an initial gravity deformation state.
+template< typename InitialStateParameterType = double >
+class InitialGravityDeformationStateEstimatableParameterSettings : public EstimatableParameterSettings
+{
+public:
+    //! Constructor, sets initial value of gravity deformation state.
+    /*!
+     * Constructor, sets initial value of gravity deformation state.
+     * \param associatedBody Body for which initial state is to be estimated.
+     * \param initialStateValue Current value of initial state
+     */
+    InitialGravityDeformationStateEstimatableParameterSettings( const std::string& associatedBody,
+                                                           const Eigen::Matrix< InitialStateParameterType, 6, 1 > initialStateValue ):
+        EstimatableParameterSettings( associatedBody, initial_gravity_deformation_state ), initialTime_( TUDAT_NAN ),
+        initialStateValue_( initialStateValue )
+    { }
+
+    //! Constructor, without initial value of gravity deformation state.
+    /*!
+     * Constructor, without initial value of gravity deformation state. Current initial state is retrieved from environment
+     * (ephemeris objects) during creation of parameter object.
+     * \param associatedBody Body for which initial state is to be estimated.
+     * \param initialTime Time at which initial state is defined.
+     */
+    InitialGravityDeformationStateEstimatableParameterSettings( const std::string& associatedBody,
+                                                           const double initialTime ):
+        EstimatableParameterSettings( associatedBody, initial_gravity_deformation_state ), initialTime_( initialTime )
+    { }
+
+    //! Time at which initial state is defined (NaN for user-defined initial state value).
+    double initialTime_;
+
+    //! Current value of initial state, set manually by used.
+    Eigen::Matrix< InitialStateParameterType, 6, 1 > initialStateValue_;
+
+};
+
 //! Class to define settings for estimating an initial rotational state.
 template< typename InitialStateParameterType = double >
 class InitialMassEstimatableParameterSettings : public EstimatableParameterSettings

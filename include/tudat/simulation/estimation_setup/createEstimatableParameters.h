@@ -17,6 +17,7 @@
 #include "tudat/astro/orbit_determination/estimatable_parameters/estimatableParameter.h"
 #include "tudat/astro/orbit_determination/estimatable_parameters/initialTranslationalState.h"
 #include "tudat/astro/orbit_determination/estimatable_parameters/initialRotationalState.h"
+#include "tudat/astro/orbit_determination/estimatable_parameters/initialGravityDeformationState.h"
 #include "tudat/astro/orbit_determination/estimatable_parameters/initialMassState.h"
 #include "tudat/astro/orbit_determination/estimatable_parameters/constantDragCoefficient.h"
 #include "tudat/astro/orbit_determination/estimatable_parameters/constantRotationRate.h"
@@ -647,6 +648,25 @@ std::vector< std::shared_ptr< estimatable_parameters::EstimatableParameterSettin
                 }
                 break;
             }
+            case gravity_deformation_state: {
+                std::shared_ptr< GravityDeformationPropagatorSettings< InitialStateParameterType, TimeType > > gravityDeformationPropagatorSettings =
+                        std::dynamic_pointer_cast< GravityDeformationPropagatorSettings< InitialStateParameterType, TimeType > >( propagatorSettings );
+
+                // Retrieve estimated and propagated gravity deformation states, and check equality.
+                std::vector< std::string > propagatedBodies = gravityDeformationPropagatorSettings->bodiesWithGravityToPropagate_;
+
+                Eigen::Matrix< InitialStateParameterType, Eigen::Dynamic, 1 > initialStates =
+                        gravityDeformationPropagatorSettings->getInitialStates( );
+                for( unsigned int i = 0; i < propagatedBodies.size( ); i++ )
+                {
+                    initialStateParameterSettings.push_back(
+                            std::make_shared< estimatable_parameters::InitialGravityDeformationStateEstimatableParameterSettings<
+                                    InitialStateParameterType > >(
+                                    propagatedBodies.at( i ),
+                                    initialStates.segment( i * 5, 5 ).template cast< InitialStateParameterType >( ) ) );
+                }
+                break;
+            }
             case body_mass_state: {
                 std::shared_ptr< MassPropagatorSettings< InitialStateParameterType, TimeType > > massPropagatorSettings =
                         std::dynamic_pointer_cast< MassPropagatorSettings< InitialStateParameterType, TimeType > >( propagatorSettings );
@@ -848,6 +868,40 @@ createInitialDynamicalStateParameterToEstimate(
                             initialRotationalState,
                             std::bind( &Body::getBodyInertiaTensor, bodies.at( initialStateSettings->parameterType_.second.first ) ),
                             initialStateSettings->baseOrientation_ );
+                }
+                break;
+            case initial_gravity_deformation_state:
+
+                // Check consistency of input.
+                if( std::dynamic_pointer_cast< InitialGravityDeformationStateEstimatableParameterSettings< InitialStateParameterType > >(
+                            parameterSettings ) == nullptr )
+                {
+                    throw std::runtime_error( "Error when making body initial gravity deformation parameter, settings type is incompatible" );
+                }
+                else
+                {
+                    std::shared_ptr< InitialGravityDeformationStateEstimatableParameterSettings< InitialStateParameterType > >
+                            initialStateSettings = std::dynamic_pointer_cast<
+                                    InitialGravityDeformationStateEstimatableParameterSettings< InitialStateParameterType > >(
+                                    parameterSettings );
+
+                    Eigen::Matrix< InitialStateParameterType, Eigen::Dynamic, 1 > initialGravityDeformationState;
+
+                    // If initial time is not defined, use preset initial state
+                    if( !( initialStateSettings->initialTime_ == initialStateSettings->initialTime_ ) )
+                    {
+                        initialGravityDeformationState = initialStateSettings->initialStateValue_;
+                    }
+                    // Compute initial state from environment
+                    else
+                    {
+                        throw std::runtime_error("Error when setting initial gravity deformation state from environment: functionality not yet implemented.");
+                    }
+
+                    // Create gravity deformation state estimation interface object
+                    initialStateParameterToEstimate = std::make_shared< InitialGravityDeformationStateParameter< InitialStateParameterType > >(
+                            initialStateSettings->parameterType_.second.first,
+                            initialGravityDeformationState );
                 }
                 break;
             case initial_mass_state: {

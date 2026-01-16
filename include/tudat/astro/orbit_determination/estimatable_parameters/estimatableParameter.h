@@ -37,6 +37,7 @@ enum EstimatebleParametersEnum {
     initial_body_state,
     initial_rotational_body_state,
     initial_mass_state,
+    initial_gravity_deformation_state,
     gravitational_parameter,
     constant_drag_coefficient,
     radiation_pressure_coefficient,
@@ -667,6 +668,10 @@ bool isDynamicalParameterSingleArc(
             break;
         }
         case initial_rotational_body_state: {
+            flag = true;
+            break;
+        }
+        case initial_gravity_deformation_state:{
             flag = true;
             break;
         }

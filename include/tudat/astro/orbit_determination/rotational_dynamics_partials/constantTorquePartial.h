@@ -58,6 +58,29 @@ public:
     //! Destructor
     ~ConstantTorquePartial( ) { }
 
+    //! Function for determining if the torque is dependent on a non-rotational integrated state.
+    /*!
+     *  Function for determining if the torque is dependent on a non-rotational integrated state.
+     *  \param stateReferencePoint Reference point id of propagated state
+     *  \param integratedStateType Type of propagated state for which dependency is to be determined.
+     *  \return True if dependency exists (non-zero partial), false otherwise.
+     */
+    bool isStateDerivativeDependentOnIntegratedAdditionalStateTypes( const std::pair< std::string, std::string >& stateReferencePoint,
+                                                                     const propagators::IntegratedStateType integratedStateType )
+    {
+        bool isStateDerivativeDependent = false;
+        if( stateReferencePoint.first == bodyUndergoingTorque_ && integratedStateType == propagators::gravity_deformation_state )
+        {
+            isStateDerivativeDependent = true;
+        }
+        return isStateDerivativeDependent;
+    }
+
+    void wrtNonRotationalStateOfAdditionalBody(
+        Eigen::Block< Eigen::MatrixXd > partialMatrix,
+        const std::pair< std::string, std::string >& stateReferencePoint,
+        const propagators::IntegratedStateType integratedStateType );
+
     //! Function for setting up and retrieving a function returning a partial w.r.t. a double parameter.
     /*!
      *  Function for setting up and retrieving a function returning a partial w.r.t. a double parameter.
@@ -131,8 +154,13 @@ public:
                 {
                     it->second.at( i )->updateMembers( currentTime );
                     currentTotalTorque_ += it->second.at( i )->getTorque( );
+                    // std::cout << "add " << it->second.at( i )->getTorque( ).transpose( ) << std::endl;
                 }
             }
+            // std::cout << "currentTotalTorque_" << std::endl;
+            // std::cout << currentTotalTorque_.transpose() << std::endl;
+            // std::cout << "constant torque partial, I = " << std::endl;
+            // std::cout << currentInertiaTensor_ << std::endl;
         }
     }
 
@@ -176,6 +204,9 @@ protected:
     void wrtSineSphericalHarmonicCoefficientsOfCentralBody( Eigen::MatrixXd& sphericalHarmonicCoefficientPartial,
                                                             const int s21Index,
                                                             const int s22Index );
+
+    void wrtGravityDeformation(
+        Eigen::Block< Eigen::MatrixXd >& deformationPartial );
 
     //! Function returning body angular velocity vector in body fixed frame.
     std::function< Eigen::Vector3d( ) > angularVelocityFunction_;

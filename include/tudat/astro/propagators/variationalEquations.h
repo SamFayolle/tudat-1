@@ -26,6 +26,8 @@
 #include "tudat/astro/orbit_determination/estimatable_parameters/initialRotationalState.h"
 #include "tudat/astro/orbit_determination/estimatable_parameters/initialMassState.h"
 #include "tudat/astro/orbit_determination/acceleration_partials/accelerationPartial.h"
+#include "tudat/astro/orbit_determination/rotational_dynamics_partials/inertialTorquePartial.h"
+#include "tudat/astro/orbit_determination/gravity_deformation_partials/maxwellDeformationPartial.h"
 
 namespace tudat
 {
@@ -108,6 +110,7 @@ public:
             setTranslationalStatePartialFrameScalingFunctions( parametersToEstimate, currentArcIndex );
         }
         setRotationalStatePartialScalingFunctions( parametersToEstimate );
+        setStateDerivativePartialInterdependencies( parametersToEstimate, stateDerivativePartialList );
         setParameterPartialFunctionList( parametersToEstimate );
     }
 
@@ -234,6 +237,43 @@ public:
         }
         //        currentMatrixDerivative.block( 0, 6, 6, 7 ).setZero( );
         //        currentMatrixDerivative.block( 6, 0, 7, 6 ).setZero( );
+
+        ///////////////////////////
+        /// ADDED STUFF
+        // unsigned int sizeInterdependenciesJacobian = 0;
+        // for ( unsigned int i = 0 ; i < stateDerivativeInterdependencyIndices_.size( ) ; i++ )
+        // {
+        //     sizeInterdependenciesJacobian += stateDerivativeInterdependencyIndices_[i].first.second;
+        // }
+        // std::cout << "sizeInterdependenciesJacobian " << sizeInterdependenciesJacobian << std::endl;
+
+        Eigen::MatrixXd interdependenciesJacobian = Eigen::MatrixXd::Zero( currentMatrixDerivative.cols(), currentMatrixDerivative.cols() );
+
+        for ( unsigned int i = 0 ; i < stateDerivativeInterdependencyIndices_.size( ) ; i++ )
+        {
+            std::pair< std::pair< int, int >, std::pair< int, int > > indices = stateDerivativeInterdependencyIndices_[i]; 
+            // std::cout << "indices " << indices.first.first << " " << indices.first.second << " - " << indices.second.first << " " << indices.second.second << std::endl;
+            Eigen::MatrixXd multiplyingFactor = stateDerivativeInterdependencyFunctions_[i]();
+            // std::cout << "multiplyingFactor" << std::endl;
+            // std::cout << multiplyingFactor << std::endl;
+            // Eigen::MatrixXd stateDerivativePartial = currentMatrixDerivative.block( indices.second.first, 0, indices.second.second, currentMatrixDerivative.cols() ).eval();
+            interdependenciesJacobian.block( indices.first.first, indices.second.first, indices.first.second, indices.second.second ) = /*inertiaTensorDependencies_[i]().inverse() * */ multiplyingFactor;
+        }
+        // std::cout << "interdependenciesJacobian" << std::endl;
+        // std::cout << interdependenciesJacobian << std::endl;
+
+        // std::cout << "original currentMatrixDerivative" << std::endl;
+        // std::cout <<  currentMatrixDerivative << std::endl;
+        
+        // Add interdependency contribution
+        Eigen::MatrixXd identity = Eigen::MatrixXd::Identity( currentMatrixDerivative.cols( ), currentMatrixDerivative.cols( ) );
+        currentMatrixDerivative = ( identity - interdependenciesJacobian ).inverse( ) * currentMatrixDerivative;
+
+        // std::cout << "w/ interdependencies" << std::endl;
+        // std::cout << currentMatrixDerivative << std::endl;
+
+        ///////////////////// END ADDED STUFF
+
     }
 
     //! Function to clear reference/cached values of state derivative partials.
@@ -303,6 +343,11 @@ public:
     std::vector< std::pair< int, int > > getStatePartialAdditionIndices( )
     {
         return statePartialAdditionIndices_;
+    }
+
+    std::vector< std::pair< std::pair< int, int >, std::pair< int, int > > > getStateDerivativeInterdependencyIndices( ) const
+    {
+        return stateDerivativeInterdependencyIndices_;
     }
 
     void suppressParameterCoupling( const int couplingEntriesToSuppress )
@@ -514,6 +559,92 @@ private:
         }
     }
 
+    template< typename ParameterType >
+    void setStateDerivativePartialInterdependencies(
+        const std::shared_ptr< estimatable_parameters::EstimatableParameterSet< ParameterType > > parametersToEstimate,
+        const std::map< IntegratedStateType, orbit_determination::StateDerivativePartialsMap > stateDerivativePartialList )
+    {
+        // Handle state derivative interdependencies
+        std::vector< std::shared_ptr< estimatable_parameters::EstimatableParameter< Eigen::Matrix< ParameterType, Eigen::Dynamic, 1 > > > > 
+            rotationalStateParametersToEstimate = getListOfRotationalStateParametersToEstimate( parametersToEstimate );
+
+        std::vector< std::shared_ptr< estimatable_parameters::EstimatableParameter< Eigen::Matrix< ParameterType, Eigen::Dynamic, 1 > > > > 
+            gravityDeformationStateParametersToEstimate = getListOfGravityDeformationStateParametersToEstimate( parametersToEstimate );
+
+        // std::vector< std::string > bodiesWithGravityDeformation = getListOfBodiesWithGravityDeformationStateToEstimate( parametersToEstimate );
+        // std::vector< std::string > bodiesWithRotationalState = getListOfBodiesWithRotationalStateToEstimate( parametersToEstimate );
+        for ( unsigned int i = 0 ; i < gravityDeformationStateParametersToEstimate.size( ) ; i++ )
+        {
+
+            std::vector< std::shared_ptr< orbit_determination::StateDerivativePartial > > deformationDerivativePartials = 
+                        stateDerivativePartialList.at( gravity_deformation_state )[i];
+
+            std::string currentBodyWithDeformationToPropagate = gravityDeformationStateParametersToEstimate[i]->getParameterName( ).second.first;
+            for ( unsigned int k = 0 ; k < rotationalStateParametersToEstimate.size( ) ; k++ )
+            {
+                if ( rotationalStateParametersToEstimate[k]->getParameterName( ).second.first == currentBodyWithDeformationToPropagate  )
+                {
+                    int sizeRotationalStatePartial = propagators::getSingleIntegrationSize( propagators::rotational_state ) - 4; // keep only angular velocity vector (remove quaternions)
+                    int sizeDeformationStatePartial = propagators::getSingleIntegrationSize( propagators::gravity_deformation_state );
+                    int indexCurrentRotationalState = stateTypeStartIndices_[ propagators::rotational_state ] + k * sizeRotationalStatePartial + 4; // keep only angular velocity vector (remove quaternions)
+                    int indexCurrentDeformationState = stateTypeStartIndices_[ propagators::gravity_deformation_state ] + i * sizeDeformationStatePartial;
+                    std::cout << "sizeRotationalStatePartial " << sizeRotationalStatePartial << std::endl;
+                    std::cout << "sizeDeformationStatePartial " << sizeDeformationStatePartial << std::endl;
+                    
+                    std::vector< std::shared_ptr< orbit_determination::StateDerivativePartial > > torqueDerivativePartials = 
+                        stateDerivativePartialList.at( rotational_state )[k];
+                    for ( unsigned int j = 0 ; j < torqueDerivativePartials.size( ) ; j++ )
+                    {
+                        if ( std::dynamic_pointer_cast< acceleration_partials::InertialTorquePartial >( torqueDerivativePartials[j] ) != nullptr )
+                        {
+                            // std::cout << "state derivative interdependency for body " << currentBodyWithDeformationToPropagate << std::endl;
+                            // int sizeRotationalStatePartial = propagators::getSingleIntegrationSize( propagators::rotational_state ) - 4; // keep only angular velocity vector (remove quaternions)
+                            // int sizeDeformationStatePartial = propagators::getSingleIntegrationSize( propagators::gravity_deformation_state );
+                            // int indexCurrentRotationalState = stateTypeStartIndices_[ propagators::rotational_state ] + k * sizeRotationalStatePartial + 4; // keep only angular velocity vector (remove quaternions)
+                            // int indexCurrentDeformationState = stateTypeStartIndices_[ propagators::gravity_deformation_state ] + i * sizeDeformationStatePartial;
+                            // std::cout << "sizeRotationalStatePartial " << sizeRotationalStatePartial << std::endl;
+                            // std::cout << "sizeDeformationStatePartial " << sizeDeformationStatePartial << std::endl;
+                            stateDerivativeInterdependencyIndices_.push_back( std::make_pair( 
+                                std::make_pair( indexCurrentRotationalState, sizeRotationalStatePartial ), std::make_pair( indexCurrentDeformationState, sizeDeformationStatePartial ) ) );
+
+                            // std::cout << "inertial torque partial detected!" << std::endl;
+                            std::shared_ptr< acceleration_partials::InertialTorquePartial > inertialTorquePartial =
+                                std::dynamic_pointer_cast< acceleration_partials::InertialTorquePartial >( torqueDerivativePartials[j] );
+                            std::function< Eigen::MatrixXd( ) > stateDerivativePartialFunction = std::bind( 
+                                &acceleration_partials::InertialTorquePartial::wrtOtherStateDerivative, inertialTorquePartial );
+                            stateDerivativeInterdependencyFunctions_.push_back( stateDerivativePartialFunction );
+                            // inertiaTensorDependencies_.push_back( std::bind( &acceleration_partials::InertialTorquePartial::getCurrentInertiaTensor, inertialTorquePartial ) );
+                        }
+                        
+                    }
+
+                    for ( unsigned int j = 0 ; j < deformationDerivativePartials.size( ) ; j++ )
+                    {
+                        if ( std::dynamic_pointer_cast< acceleration_partials::MaxwellDeformationPartial >( deformationDerivativePartials[j] ) != nullptr )
+                        {
+                            std::shared_ptr< acceleration_partials::MaxwellDeformationPartial > maxwellDeformationPartial =
+                                std::dynamic_pointer_cast< acceleration_partials::MaxwellDeformationPartial >( deformationDerivativePartials[j] );
+                            
+                            // Dependency only active if the contribution of the centrifugal potential is included
+                            if ( maxwellDeformationPartial->getDeformationModel( )->isCentrifugalPotentialIncluded( ) )
+                            {
+                                std::cout << "state derivative interdependency for body " << currentBodyWithDeformationToPropagate << std::endl;
+                                stateDerivativeInterdependencyIndices_.push_back( std::make_pair( 
+                                    std::make_pair( indexCurrentDeformationState, sizeDeformationStatePartial ), std::make_pair( indexCurrentRotationalState, sizeRotationalStatePartial ) ) );
+
+                                std::cout << "angular velocity derivative partial detected!" << std::endl;
+                                std::function< Eigen::MatrixXd( ) > stateDerivativePartialFunction = std::bind( 
+                                    &acceleration_partials::MaxwellDeformationPartial::wrtOtherStateDerivative, maxwellDeformationPartial );
+                                stateDerivativeInterdependencyFunctions_.push_back( stateDerivativePartialFunction );
+                                // inertiaTensorDependencies_.push_back([]() { return Eigen::MatrixXd::Identity(5, 5); });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     //! Function that sets the pre-multipliers for angular acceleration partial derivatives
     /*!
      *  Function that sets the pre-multipliers for angular acceleration partial derivatives
@@ -574,6 +705,11 @@ private:
      * \sa setTranslationalStatePartialFrameScalingFunctions
      */
     std::vector< std::pair< int, int > > statePartialAdditionIndices_;
+
+    // 
+    std::vector< std::pair< std::pair< int, int >, std::pair< int, int > > > stateDerivativeInterdependencyIndices_;
+    std::vector< std::function< Eigen::MatrixXd( ) > > stateDerivativeInterdependencyFunctions_; 
+    std::vector< std::function< Eigen::MatrixXd( ) > > inertiaTensorDependencies_;
 
     //! Functions returning inertia tensors of bodies, to be used for rotational variational equations
     std::vector< std::pair< int, std::function< Eigen::Matrix3d( ) > > > inertiaTensorsForMultiplication_;

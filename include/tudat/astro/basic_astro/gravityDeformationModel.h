@@ -171,8 +171,8 @@ public:
             const std::vector< std::string > perturbingBody,
             const double maxwellRelaxationTime,
             const double globalRelaxationTime,
-            const double gravitationalParameterDeformingBody,
-            const std::vector< double > gravitationalParameterPerturbingBody,
+            const std::function< double( ) > gravitationalParameterDeformingBody,
+            const std::vector< std::function< double( ) > > gravitationalParameterPerturbingBody,
             const double referenceRadius,
             const std::function< Eigen::Vector3d( ) > angularVelocityDeformingBody,
             const std::function< Eigen::Vector3d( ) > angularVelocityDerivativeDeformingBody,
@@ -188,7 +188,7 @@ public:
                 rotationToLocalFrameDerivativeFunction = [ ]( ){ return Eigen::Matrix3d::Zero( ); },
             const Eigen::VectorXd staticCoefficients = Eigen::VectorXd::Zero( 3 ),
             const bool includeOrder1 = true,
-            const bool negativeSignLatitude = false ) //,
+            const bool includeCentrifugalPotential = false ) //,
             /*std::shared_ptr< basic_mathematics::SphericalHarmonicsCache > sphericalHarmonicsCache =
             std::make_shared< basic_mathematics::SphericalHarmonicsCache >( ) )*/ : 
             GravityDeformationModel( ),
@@ -213,10 +213,12 @@ public:
           rotationToBodyFixedDerivativeFunction_( rotationToLocalFrameDerivativeFunction ),
           staticCoefficients_( staticCoefficients ),
           includeOrder1_( includeOrder1 ),
-          negativeSignLatitude_( negativeSignLatitude ),
+          includeCentrifugalPotential_( includeCentrifugalPotential ),
           /*sphericalHarmonicsCache_( sphericalHarmonicsCache ),*/
           saveSphericalHarmonicTermsSeparately_( false )
     {
+        gravitationalParametersRatio_ = gravitationalParameterPerturbingBody_[ 0 ]( ) / gravitationalParameterDeformingBody_( ); // TO BE MODIFIED -> FOR NOW SET TO INDEX 0
+
         unsigned int numberPerturbingBodies = perturbingBody.size();
         stateOfPerturbingBody_.resize( numberPerturbingBodies );
         currentRelativePosition_.resize( numberPerturbingBodies );
@@ -225,8 +227,10 @@ public:
         currentInertialRelativeState_.resize( numberPerturbingBodies );
         currentLongitude_.resize( numberPerturbingBodies );
         currentLatitude_.resize( numberPerturbingBodies );
+        currentDistance_.resize( numberPerturbingBodies );
         currentLongitudeDerivative_.resize( numberPerturbingBodies );
         currentLatitudeDerivative_.resize( numberPerturbingBodies );
+        currentDistanceDerivative_.resize( numberPerturbingBodies );
 
         // Initialise nominal coefficient values
         nominalCoefficients_ = Eigen::VectorXd::Zero( 5 );
@@ -269,7 +273,7 @@ public:
         // updateEquilibriumDeformation( );
         // std::cout << "original equilibriumCoefficients: " << equilibriumCoefficients_.transpose( ) << std::endl;
 
-        std::cout << "done creating MaxwellDeformation model" << std::endl;
+        // std::cout << "done creating MaxwellDeformation model" << std::endl;
 
     }
 
@@ -577,30 +581,43 @@ public:
         return sphericalHarmonicsCache_;
     }
 
-    // //! Function to return current position vector from body exerting acceleration to body undergoing acceleration, in frame
-    // //! fixed to body undergoing acceleration
-    // /*!
-    //  * Function to return current position vector from body exerting acceleration to body undergoing acceleration, in frame
-    //  * fixed to bodyundergoing acceleration
-    //  * \return Current position vector from body exerting acceleration to body undergoing acceleration, in frame
-    //  * fixed to bodyundergoing acceleration
-    //  */
-    // Eigen::Vector3d getCurrentRelativePosition( )
-    // {
-    //     return currentRelativePosition_;
-    // }
+    //! Function to return current position vector from body exerting acceleration to body undergoing acceleration, in frame
+    //! fixed to body undergoing acceleration
+    /*!
+     * Function to return current position vector from body exerting acceleration to body undergoing acceleration, in frame
+     * fixed to bodyundergoing acceleration
+     * \return Current position vector from body exerting acceleration to body undergoing acceleration, in frame
+     * fixed to bodyundergoing acceleration
+     */
+    std::vector< Eigen::Vector3d > getCurrentRelativePosition( )
+    {
+        return currentRelativePosition_;
+    }
 
-    // //! Function to return current position vector from body exerting acceleration to body undergoing acceleration, in inertial
-    // //! frame
-    // /*!
-    //  * Function to return current position vector from body exerting acceleration to body undergoing acceleration, in inertial
-    //  * frame
-    //  * \return Current position vector from body exerting acceleration to body undergoing acceleration, in inertial frame
-    //  */
-    // Eigen::Vector6d getCurrentInertialRelativeState( )
-    // {
-    //     return currentInertialRelativeState_;
-    // }
+    //! Function to return current position vector from body exerting acceleration to body undergoing acceleration, in frame
+    //! fixed to body undergoing acceleration
+    /*!
+     * Function to return current position vector from body exerting acceleration to body undergoing acceleration, in frame
+     * fixed to bodyundergoing acceleration
+     * \return Current position vector from body exerting acceleration to body undergoing acceleration, in frame
+     * fixed to bodyundergoing acceleration
+     */
+    std::vector< Eigen::Vector3d > getCurrentRelativeVelocity( )
+    {
+        return currentRelativeVelocity_;
+    }
+
+    //! Function to return current position vector from body exerting acceleration to body undergoing acceleration, in inertial
+    //! frame
+    /*!
+     * Function to return current position vector from body exerting acceleration to body undergoing acceleration, in inertial
+     * frame
+     * \return Current position vector from body exerting acceleration to body undergoing acceleration, in inertial frame
+     */
+    std::vector< Eigen::Vector6d > getCurrentInertialRelativeState( )
+    {
+        return currentInertialRelativeState_;
+    }
 
     //! Function to retrieve the spherical harmonics reference radius.
     /*!
@@ -762,12 +779,17 @@ public:
 
     double getGravitationalParameterDeformingBody( ) const
     {
-        return gravitationalParameterDeformingBody_;
+        return gravitationalParameterDeformingBody_( );
     } 
 
     std::vector< double > getGravitationalParameterPerturbingBody( ) const
     {
-        return gravitationalParameterPerturbingBody_;
+        std::vector< double > gravitationalParameters;
+        for ( unsigned int i = 0 ; i < gravitationalParameterPerturbingBody_.size( ) ; i++ )
+        {
+            gravitationalParameters.push_back( gravitationalParameterPerturbingBody_[i]() );
+        }
+        return gravitationalParameters;
     } 
 
     double getReferenceRadius( ) const
@@ -785,15 +807,82 @@ public:
         return stateOfPerturbingBodyFunction_;
     }
 
+    std::vector< double > getCurrentLongitude() const 
+    {
+        return currentLongitude_;
+    }
+
+    std::vector< double > getCurrentLatitude() const 
+    {
+        return currentLatitude_;
+    }
+
+    std::vector< double > getCurrentDistance() const 
+    {
+        return currentDistance_;
+    }
+
+    std::vector< double > getCurrentLongitudeDerivative() const 
+    {
+        return currentLongitudeDerivative_;
+    }
+
+    std::vector< double > getCurrentLatitudeDerivative() const 
+    {
+        return currentLatitudeDerivative_;
+    }
+
+    std::vector< double > getCurrentDistanceDerivative() const 
+    {
+        return currentDistanceDerivative_;
+    }
+
+    double getGravitationalParametersRatio() const
+    {
+        return gravitationalParametersRatio_;
+    }
+
     // void resetRotationRateDerivative( const double rotationRateDerivative )
     // {
     //     rotationRateDerivative_ = rotationRateDerivative;
     // }
 
+    Eigen::Matrix3d getCurrentRotationToLocalFrameDerivative( ) const
+    {
+        return currentRotationToLocalFrameDerivative_;
+    }
+
+    Eigen::Vector3d getCurrentAngularVelocityDeformingBody( ) const
+    {
+        return currentAngularVelocityDeformingBody_;
+    }
+
+    Eigen::Vector3d getCurrentAngularVelocityDerivativeDeformingBody( ) const
+    {
+        return currentAngularVelocityDerivativeDeformingBody_;
+    }
+
+    Eigen::Vector6d getStateOfDeformingBody() const
+    {
+        return stateOfDeformingBody_;
+    }
+
+    bool isCentrifugalPotentialIncluded( ) const
+    {
+        return includeCentrifugalPotential_;
+    }
+
+    bool isOrder1Included( ) const
+    {
+        return includeOrder1_;
+    }
+
 
 protected:
 
 private:
+
+    double gravitationalParametersRatio_;
 
     Eigen::Vector6d stateOfDeformingBody_;
 
@@ -805,9 +894,9 @@ private:
 
     const double globalRelaxationTime_;
 
-    const double gravitationalParameterDeformingBody_;
+    const std::function< double( ) > gravitationalParameterDeformingBody_;
 
-    const std::vector< double > gravitationalParameterPerturbingBody_;
+    const std::vector< std::function< double( ) > > gravitationalParameterPerturbingBody_;
 
     const double referenceRadius_;
 
@@ -858,6 +947,11 @@ private:
     //! Current rotation from body-fixed frame to integration frame.
     Eigen::Quaterniond rotationToIntegrationFrame_;
 
+    Eigen::Matrix3d currentRotationToLocalFrameDerivative_;
+
+    Eigen::Vector3d currentAngularVelocityDeformingBody_;
+    Eigen::Vector3d currentAngularVelocityDerivativeDeformingBody_;
+
     //! Current position vector from body exerting acceleration to body undergoing acceleration, in frame fixed to body
     //! undergoing acceleration
     std::vector< Eigen::Vector3d > currentRelativePosition_;
@@ -898,16 +992,30 @@ private:
     //! Current body-fixed latitude of the perturbing body
     std::vector< double > currentLatitude_;
 
+    std::vector< double > currentDistance_;
+
     std::vector< double > currentLongitudeDerivative_;
     std::vector< double > currentLatitudeDerivative_;
+    std::vector< double > currentDistanceDerivative_;
 
     const bool includeOrder1_;
-    const bool negativeSignLatitude_;
+    const bool includeCentrifugalPotential_;
 
     std::function< Eigen::Vector3d( ) > angularVelocityDeformingBody_;
     std::function< Eigen::Vector3d( ) > angularVelocityDerivativeDeformingBody_;
 
 };
+
+//! Update the members of a gravity deformation model and evaluate the deformation.
+/*!
+ * Updates the member variables of a gravity deformation model and subsequently evaluates the
+ * deformation. This allows the user to suffice with a single function call to both update the
+ * members and evaluate the deformation.
+ * \param gravityDeformationModel Gravity deformation model that is to be evaluated.
+ * \param currentTime Time at which deformation model is to be updated.
+ * \return Gravity deformation that is obtained following the member update.
+ */
+Eigen::Vector5d updateAndGetDeformation( const std::shared_ptr< GravityDeformationModel > gravityDeformationModel, const double currentTime = TUDAT_NAN );
 
 } // namespace basic_astrodynamics
 } // namespace tudat

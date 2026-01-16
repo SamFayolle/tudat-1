@@ -39,16 +39,44 @@ public:
      */
     InertialTorquePartial( const std::function< Eigen::Vector3d( ) > angularVelocityFunction,
                            const std::function< Eigen::Matrix3d( ) > inertiaTensorFunction,
+                           const std::function< Eigen::Matrix3d( ) > inertiaTensorDerivativeFunction,
                            const std::function< double( ) > inertiaTensorNormalizationFunction,
                            const std::function< double( ) > bodyGravitationalParameterFunction,
                            const std::string acceleratedBody ):
         TorquePartial( acceleratedBody, acceleratedBody, basic_astrodynamics::torque_free ),
-        angularVelocityFunction_( angularVelocityFunction ), inertiaTensorFunction_( inertiaTensorFunction ),
+        angularVelocityFunction_( angularVelocityFunction ), 
+        inertiaTensorFunction_( inertiaTensorFunction ),
+        inertiaTensorDerivativeFunction_( inertiaTensorDerivativeFunction ),
         getInertiaTensorNormalizationFactor_( inertiaTensorNormalizationFunction ),
         bodyGravitationalParameterFunction_( bodyGravitationalParameterFunction )
     { }
 
     ~InertialTorquePartial( ) { }
+
+    //! Function for determining if the torque is dependent on a non-rotational integrated state.
+    /*!
+     *  Function for determining if the torque is dependent on a non-rotational integrated state.
+     *  \param stateReferencePoint Reference point id of propagated state
+     *  \param integratedStateType Type of propagated state for which dependency is to be determined.
+     *  \return True if dependency exists (non-zero partial), false otherwise.
+     */
+    bool isStateDerivativeDependentOnIntegratedAdditionalStateTypes( const std::pair< std::string, std::string >& stateReferencePoint,
+                                                                     const propagators::IntegratedStateType integratedStateType )
+    {
+        bool isStateDerivativeDependent = false;
+        if( stateReferencePoint.first == bodyUndergoingTorque_ && integratedStateType == propagators::gravity_deformation_state )
+        {
+            isStateDerivativeDependent = true;
+        }
+        return isStateDerivativeDependent;
+    }
+
+    void wrtNonRotationalStateOfAdditionalBody(
+        Eigen::Block< Eigen::MatrixXd > partialMatrix,
+        const std::pair< std::string, std::string >& stateReferencePoint,
+        const propagators::IntegratedStateType integratedStateType );
+
+    Eigen::MatrixXd wrtOtherStateDerivative();
 
     //! Function for setting up and retrieving a function returning a partial w.r.t. a double parameter.
     /*!
@@ -126,13 +154,31 @@ public:
             currentInertiaTensorNormalizationFactor_ = getInertiaTensorNormalizationFactor_( );
             currentGravitationalParameter_ = bodyGravitationalParameterFunction_( );
 
-            currentInertiaTensor_ = inertiaTensorFunction_( );
+            currentInertiaTensor_ = inertiaTensorFunction_( ); 
             currentInverseInertiaTensor_ = currentInertiaTensor_.inverse( );
+            currentInertiaTensorDerivative_ = inertiaTensorDerivativeFunction_( );
 
-            currentPartialDerivativeWrtAngularVelocity_ =
+            currentPartialDerivativeWrtAngularVelocity_ = 
                     -linear_algebra::getCrossProductMatrix( currentAngularVelocityVector_ ) * currentInertiaTensor_ +
-                    linear_algebra::getCrossProductMatrix( currentInertiaTensor_ * currentAngularVelocityVector_ );
+                    linear_algebra::getCrossProductMatrix( currentInertiaTensor_ * currentAngularVelocityVector_ )
+                    - currentInertiaTensorDerivative_;         
+
+            // std::cout << "currentPartialDerivativeWrtAngularVelocity_" << std::endl;
+            // std::cout << -linear_algebra::getCrossProductMatrix( currentAngularVelocityVector_ ) * currentInertiaTensor_ +
+            //         linear_algebra::getCrossProductMatrix( currentInertiaTensor_ * currentAngularVelocityVector_ ) << std::endl;
+            // std::cout << " in inertial torque partial currentInertiaTensorDerivative_" << std::endl;
+            // std::cout << currentInertiaTensorDerivative_ << std::endl;
+
+            // std::cout << "Inertial torque partial, I = " << std::endl;
+            // std::cout << currentInertiaTensor_ << std::endl;
+            // std::cout << "currentAngularVelocityVector_" << std::endl;
+            // std::cout << currentAngularVelocityVector_.transpose() << std::endl;
         }
+    }
+
+    Eigen::MatrixXd getCurrentInertiaTensor()
+    {
+        return currentInertiaTensor_;
     }
 
 protected:
@@ -176,11 +222,17 @@ protected:
                                                             const int s21Index,
                                                             const int s22Index );
 
+    void wrtGravityDeformation(
+        Eigen::Block< Eigen::MatrixXd >& deformationPartial );
+
     //! Function returning body angular velocity vector in body fixed frame.
     std::function< Eigen::Vector3d( ) > angularVelocityFunction_;
 
     //! Function returning body inertia tensor
     std::function< Eigen::Matrix3d( ) > inertiaTensorFunction_;
+
+    //! Function returning body inertia tensor derivative
+    std::function< Eigen::Matrix3d( ) > inertiaTensorDerivativeFunction_;
 
     //! Function the inertia tensor normalization factor
     std::function< double( ) > getInertiaTensorNormalizationFactor_;
@@ -199,6 +251,9 @@ protected:
 
     //! Current inverse inertia tensor
     Eigen::Matrix3d currentInverseInertiaTensor_;
+
+    //! Current inertia tensor derivative
+    Eigen::Matrix3d currentInertiaTensorDerivative_;
 
     //! Current partial derivative w.r.t. angular velocity vector
     Eigen::Matrix3d currentPartialDerivativeWrtAngularVelocity_;

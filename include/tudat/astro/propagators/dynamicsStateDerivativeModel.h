@@ -279,17 +279,6 @@ public:
             }
         }
 
-        // If variational equations are to be integrated: evaluate and set.
-        if( evaluateVariationalEquations_ )
-        {
-            variationalEquations_->updatePartials( time, currentStatesPerTypeInConventionalRepresentation_ );
-
-            variationalEquations_->evaluateVariationalEquations< StateScalarType >(
-                    time,
-                    state.block( 0, 0, totalConventionalStateSize_, variationalEquations_->getNumberOfParameterValues( ) ),
-                    stateDerivative_.block( 0, 0, totalConventionalStateSize_, variationalEquations_->getNumberOfParameterValues( ) ) );
-        }
-
         // Update counters
         functionEvaluationCounter_++;
         cumulativeFunctionEvaluationCounter_[ time ] = functionEvaluationCounter_;
@@ -303,8 +292,8 @@ public:
         bool interdependencies = true;
         bool convergenceReached = false;
         int iterations = 1;
-        int maxIterations = 4;
-        double convergenceTolerance = 1.0e-14;
+        int maxIterations = 20; // 10
+        double convergenceTolerance = 1.0e-10;
         while ( interdependencies && !convergenceReached )
         {
             // std::cout << "ITERATION " << iterations << std::endl;
@@ -312,8 +301,13 @@ public:
             // Iterate
             oldStateDerivative_ = stateDerivative_;
 
+            // std::cout << "full " << std::endl;
+            // std::cout << stateDerivative_ << std::endl;
+            // std::cout << "subset " << std::endl;
+            // std::cout <<  stateDerivative_.block( 0, dynamicsStartColumn_, stateDerivative_.rows( ), 1 ) << std::endl;
+
             // Update state derivative values in environment and state derivative models
-            stateDerivativeUpdater_->updateEnvironmentFromStateDerivative( time, stateDerivative_ );
+            stateDerivativeUpdater_->updateEnvironmentFromStateDerivative( time, stateDerivative_.block( 0, dynamicsStartColumn_, stateDerivative_.rows( ), 1 ) );
             stateDerivativeUpdater_->updateStateDerivativeModels( time );
 
 
@@ -331,7 +325,13 @@ public:
                 }
             }
 
-
+            // StateType derivativeUpdate = stateDerivative_ - oldStateDerivative_;
+            // std::cout << "derivativeUpdate" << std::endl;
+            // std::cout << derivativeUpdate << std::endl;
+            // std::cout << "oldStateDerivative_" << std::endl;
+            // std::cout << oldStateDerivative_ << std::endl;
+            // std::cout << "newStateDerivative_" << std::endl;
+            // std::cout << stateDerivative_ << std::endl;
             // std::cout << "oldStateDerivative_: " << oldStateDerivative_.transpose( ) << std::endl;
             // std::cout << "NEW state derivative: " << stateDerivative_.transpose( ) << std::endl;
 
@@ -343,7 +343,7 @@ public:
             {
                 for ( unsigned int j = 0 ; j < oldStateDerivative_.cols( ) ; j++ )
                 {
-                    if ( std::fabs( oldStateDerivative_( i, j ) - stateDerivative_( i, j ) ) > convergenceTolerance )
+                    if ( std::fabs( oldStateDerivative_( i, j ) - stateDerivative_( i, j ) ) / std::fabs( oldStateDerivative_( i, j ) ) > convergenceTolerance )
                     {
                         // std::cout << "std::fabs( oldStateDerivative_( i, j ) - stateDerivative_( i, j ) ) " << 
                             // std::fabs( oldStateDerivative_( i, j ) - stateDerivative_( i, j ) ) << std::endl;
@@ -360,6 +360,22 @@ public:
                 convergenceReached = true;
             }
 
+            // if ( convergenceReached )
+            // {
+            //     std::cout << iterations << " iterations needed" << std::endl;
+            // }
+
+        }
+
+        // If variational equations are to be integrated: evaluate and set.
+        if( evaluateVariationalEquations_ )
+        {
+            variationalEquations_->updatePartials( time, currentStatesPerTypeInConventionalRepresentation_ );
+
+            variationalEquations_->evaluateVariationalEquations< StateScalarType >(
+                    time,
+                    state.block( 0, 0, totalConventionalStateSize_, variationalEquations_->getNumberOfParameterValues( ) ),
+                    stateDerivative_.block( 0, 0, totalConventionalStateSize_, variationalEquations_->getNumberOfParameterValues( ) ) );
         }
 
 

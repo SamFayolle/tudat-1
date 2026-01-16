@@ -15,6 +15,7 @@
 
 # Add subdirectories.
 add_subdirectory(acceleration_partials)
+add_subdirectory(gravity_deformation_partials)
 add_subdirectory(rotational_dynamics_partials)
 add_subdirectory(observation_partials)
 
@@ -64,6 +65,11 @@ TUDAT_ADD_TEST_CASE(TimeBiasEstimation
      )
 
 TUDAT_ADD_TEST_CASE(RotationalStateEstimation
+    PRIVATE_LINKS
+    ${Tudat_ESTIMATION_LIBRARIES}
+    )
+
+TUDAT_ADD_TEST_CASE(GravityDeformationStateEstimation
     PRIVATE_LINKS
     ${Tudat_ESTIMATION_LIBRARIES}
     )

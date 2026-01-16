@@ -151,6 +151,27 @@ public:
                 }
                 break;
             }
+            case propagators::gravity_deformation_state:
+            {
+                // Check if reference id is consistent.
+                if( stateReferencePoint.second != "" )
+                {
+                    throw std::runtime_error(
+                            "Error when getting state derivative partial acceleration model, cannot have reference point on body for body "
+                            "gravity deformation" );
+                }
+                else if( isStateDerivativeDependentOnIntegratedAdditionalStateTypes( stateReferencePoint, integratedStateType ) )
+                {
+                    partialFunction = std::make_pair( std::bind( &AccelerationPartial::wrtNonTranslationalStateOfAdditionalBody,
+                                                                 this,
+                                                                 std::placeholders::_1,
+                                                                 stateReferencePoint,
+                                                                 integratedStateType,
+                                                                 true ),
+                                                      5 );
+                }
+                break;
+            }
             case propagators::custom_state: {
                 break;
             }

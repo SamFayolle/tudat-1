@@ -24,6 +24,7 @@ set(estimatable_parameters_HEADERS
   "gravitationalParameter.h"
   "initialTranslationalState.h"
   "initialRotationalState.h"
+  "initialGravityDeformationState.h"
   "initialMassState.h"
   "radiationPressureCoefficient.h"
   "sphericalHarmonicSineCoefficients.h"

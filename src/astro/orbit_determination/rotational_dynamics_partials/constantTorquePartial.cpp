@@ -16,6 +16,18 @@ namespace tudat
 namespace acceleration_partials
 {
 
+//! Function for calculating the partial of the torque w.r.t. a non-rotational integrated state
+void ConstantTorquePartial::wrtNonRotationalStateOfAdditionalBody(
+        Eigen::Block< Eigen::MatrixXd > partialMatrix,
+        const std::pair< std::string, std::string >& stateReferencePoint,
+        const propagators::IntegratedStateType integratedStateType )
+{
+    if( stateReferencePoint.first == bodyUndergoingTorque_  && integratedStateType == propagators::gravity_deformation_state )
+    {
+        wrtGravityDeformation( partialMatrix );
+    }
+}
+
 //! Function for setting up and retrieving a function returning a partial w.r.t. a double parameter.
 std::pair< std::function< void( Eigen::MatrixXd& ) >, int > ConstantTorquePartial::getParameterPartialFunction(
         std::shared_ptr< estimatable_parameters::EstimatableParameter< double > > parameter )
@@ -198,6 +210,33 @@ void ConstantTorquePartial::wrtSineSphericalHarmonicCoefficientsOfCentralBody( E
                 -basic_mathematics::calculateLegendreGeodesyNormalizationFactor( 2, 2 ) * currentInertiaTensorNormalizationFactor_ *
                 UNSCALED_INERTIAL_TENSOR_PARTIAL_WRT_S22 * currentInverseInertiaTensor_ * currentTotalTorque_;
     }
+}
+
+//! Function to compute partial of torque w.r.t. gravity field deformation
+void ConstantTorquePartial::wrtGravityDeformation(
+        Eigen::Block< Eigen::MatrixXd >& deformationPartial )
+{
+    // deformationPartial.setZero( );
+
+    Eigen::MatrixXd cosinePartials = Eigen::MatrixXd::Zero( 3, 3 );
+    wrtCosineSphericalHarmonicCoefficientsOfCentralBody( cosinePartials, 0, 1, 2 );
+    Eigen::MatrixXd sinePartials = Eigen::MatrixXd::Zero( 3, 2 );
+    wrtSineSphericalHarmonicCoefficientsOfCentralBody( sinePartials, 0, 1 );
+
+    cosinePartials.block(0, 0, 3, 1) /= basic_mathematics::calculateLegendreGeodesyNormalizationFactor( 2, 0 );
+    cosinePartials.block(0, 1, 3, 1) /= basic_mathematics::calculateLegendreGeodesyNormalizationFactor( 2, 1 );
+    cosinePartials.block(0, 2, 3, 1) /= basic_mathematics::calculateLegendreGeodesyNormalizationFactor( 2, 2 );
+
+    sinePartials.block(0, 0, 3, 1) /= basic_mathematics::calculateLegendreGeodesyNormalizationFactor( 2, 1 );
+    sinePartials.block(0, 1, 3, 1) /= basic_mathematics::calculateLegendreGeodesyNormalizationFactor( 2, 2 );
+
+    // // in case no order 1
+    // cosinePartials.block(0, 1, 3, 1) = Eigen::MatrixXd::Zero( 3, 1 );
+    // sinePartials.block(0, 0, 3, 1) = Eigen::MatrixXd::Zero( 3, 1 );
+
+    deformationPartial.block(0, 0, 3, 3) += cosinePartials;
+    deformationPartial.block(0, 3, 3, 2) += sinePartials;
+
 }
 
 }  // namespace acceleration_partials

@@ -190,6 +190,10 @@ public:
         {
             doesDependencyExist = true;
         }
+        else if ( stateReferencePoint.first == acceleratingBody_ && integratedStateType == propagators::gravity_deformation_state )
+        {
+            doesDependencyExist = true;
+        } 
         return doesDependencyExist;
     }
 
@@ -232,6 +236,12 @@ public:
             Eigen::MatrixXd tempMatrix = Eigen::MatrixXd::Zero( 3, 7 );
             wrtRotationModelParameter( tempMatrix, estimatable_parameters::initial_rotational_body_state, "" );
             partialMatrix.block( 0, 0, 3, 7 ) = ( addContribution ? 1.0 : -1.0 ) * tempMatrix;
+        }
+        if( stateReferencePoint.first == acceleratingBody_ && integratedStateType == propagators::gravity_deformation_state )
+        {
+            Eigen::MatrixXd tempMatrix = Eigen::MatrixXd::Zero( 3, 5 );
+            wrtGravityDeformation( tempMatrix );
+            partialMatrix.block( 0, 0, 3, 5 ) = ( addContribution ? 1.0 : -1.0 ) * tempMatrix;
         }
     }
 
@@ -382,6 +392,8 @@ protected:
     void wrtRotationModelParameter( Eigen::MatrixXd& accelerationPartial,
                                     const estimatable_parameters::EstimatebleParametersEnum parameterType,
                                     const std::string& secondaryIdentifier );
+
+    void wrtGravityDeformation( Eigen::MatrixXd& accelerationPartial );
 
     //! Function to calculate an acceleration partial wrt a tidal parameter.
     /*!

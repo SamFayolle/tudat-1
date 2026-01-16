@@ -1218,10 +1218,7 @@ public:
             const simulation_setup::SystemOfBodies& bodies,
             const std::vector< std::string >& bodiesToIntegrate ):
         SingleArcIntegratedStateProcessor<  TimeType, StateScalarType >(
-            gravity_deformation_state, std::make_pair( startIndex, bodiesToIntegrate.size( ) ), bodies, bodiesToIntegrate )
-    { 
-        std::cout << "in GravityIntegratedStateProcessor constructor" << std::endl;
-    }
+            gravity_deformation_state, std::make_pair( startIndex, bodiesToIntegrate.size( ) ), bodies, bodiesToIntegrate ){ }
 
     //! Destructor
     ~GravityIntegratedStateProcessor( ){ }

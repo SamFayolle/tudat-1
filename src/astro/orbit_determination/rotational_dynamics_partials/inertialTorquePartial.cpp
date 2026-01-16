@@ -17,6 +17,44 @@ namespace tudat
 namespace acceleration_partials
 {
 
+//! Function for calculating the partial of the torque w.r.t. a non-rotational integrated state
+void InertialTorquePartial::wrtNonRotationalStateOfAdditionalBody(
+        Eigen::Block< Eigen::MatrixXd > partialMatrix,
+        const std::pair< std::string, std::string >& stateReferencePoint,
+        const propagators::IntegratedStateType integratedStateType )
+{
+    if( stateReferencePoint.first == bodyUndergoingTorque_  && integratedStateType == propagators::gravity_deformation_state )
+    {
+        wrtGravityDeformation( partialMatrix );
+    }
+}
+
+Eigen::MatrixXd InertialTorquePartial::wrtOtherStateDerivative()
+{
+    Eigen::MatrixXd partialWrtDeformationDerivative = Eigen::MatrixXd::Zero( 3, 5 );
+
+    // std::cout << "currentInertiaTensorNormalizationFactor_ " << currentInertiaTensorNormalizationFactor_ << std::endl;
+
+    Eigen::VectorXd partialWrtDerivativeC20 = - currentInertiaTensorNormalizationFactor_ * UNSCALED_INERTIAL_TENSOR_PARTIAL_WRT_C20 * currentAngularVelocityVector_;
+    Eigen::VectorXd partialWrtDerivativeC21 = - currentInertiaTensorNormalizationFactor_ * UNSCALED_INERTIAL_TENSOR_PARTIAL_WRT_C21 * currentAngularVelocityVector_;
+    Eigen::VectorXd partialWrtDerivativeC22 = - currentInertiaTensorNormalizationFactor_ * UNSCALED_INERTIAL_TENSOR_PARTIAL_WRT_C22 * currentAngularVelocityVector_;
+    Eigen::VectorXd partialWrtDerivativeS21 = - currentInertiaTensorNormalizationFactor_ * UNSCALED_INERTIAL_TENSOR_PARTIAL_WRT_S21 * currentAngularVelocityVector_;
+    Eigen::VectorXd partialWrtDerivativeS22 = - currentInertiaTensorNormalizationFactor_ * UNSCALED_INERTIAL_TENSOR_PARTIAL_WRT_S22 * currentAngularVelocityVector_;
+
+    partialWrtDeformationDerivative.block(0, 0, 3, 1) = partialWrtDerivativeC20;
+    partialWrtDeformationDerivative.block(0, 1, 3, 1) = partialWrtDerivativeC21;
+    partialWrtDeformationDerivative.block(0, 2, 3, 1) = partialWrtDerivativeC22;
+    partialWrtDeformationDerivative.block(0, 3, 3, 1) = partialWrtDerivativeS21;
+    partialWrtDeformationDerivative.block(0, 4, 3, 1) = partialWrtDerivativeS22;
+
+    // std::cout << "partialWrtDeformationDerivative" << std::endl;
+    // std::cout << partialWrtDeformationDerivative << std::endl;
+
+    partialWrtDeformationDerivative = currentInertiaTensor_.inverse( ) * partialWrtDeformationDerivative;
+
+    return partialWrtDeformationDerivative;
+}
+
 //! Function for setting up and retrieving a function returning a partial w.r.t. a double parameter.
 std::pair< std::function< void( Eigen::MatrixXd& ) >, int > InertialTorquePartial::getParameterPartialFunction(
         std::shared_ptr< estimatable_parameters::EstimatableParameter< double > > parameter )
@@ -200,6 +238,41 @@ void InertialTorquePartial::wrtSineSphericalHarmonicCoefficientsOfCentralBody( E
                 -basic_mathematics::calculateLegendreGeodesyNormalizationFactor( 2, 2 ) * currentAngularVelocityCrossProductMatrix_ *
                 currentInertiaTensorNormalizationFactor_ * UNSCALED_INERTIAL_TENSOR_PARTIAL_WRT_S22 * currentAngularVelocityVector_;
     }
+}
+
+//! Function to compute partial of torque w.r.t. gravity field deformation
+void InertialTorquePartial::wrtGravityDeformation(
+        Eigen::Block< Eigen::MatrixXd >& deformationPartial )
+{
+    // deformationPartial.setZero( );
+
+    Eigen::MatrixXd cosinePartials = Eigen::MatrixXd::Zero( 3, 3 );
+    wrtCosineSphericalHarmonicCoefficientsOfCentralBody( cosinePartials, 0, 1, 2 );
+    Eigen::MatrixXd sinePartials = Eigen::MatrixXd::Zero( 3, 2 );
+    wrtSineSphericalHarmonicCoefficientsOfCentralBody( sinePartials, 0, 1 );
+
+    // std::cout << "cosine partials" << std::endl;
+    // std::cout << cosinePartials << std::endl;
+    // std::cout << "sine partials" << std::endl;
+    // std::cout << sinePartials << std::endl;
+    // std::cout << "(2,0) " << basic_mathematics::calculateLegendreGeodesyNormalizationFactor( 2, 0 ) << std::endl;
+    // std::cout << "(2,1) " << basic_mathematics::calculateLegendreGeodesyNormalizationFactor( 2, 1 ) << std::endl;
+    // std::cout << "(2,2) " << basic_mathematics::calculateLegendreGeodesyNormalizationFactor( 2, 2 ) << std::endl;
+
+    cosinePartials.block(0, 0, 3, 1) /= basic_mathematics::calculateLegendreGeodesyNormalizationFactor( 2, 0 );
+    cosinePartials.block(0, 1, 3, 1) /= basic_mathematics::calculateLegendreGeodesyNormalizationFactor( 2, 1 );
+    cosinePartials.block(0, 2, 3, 1) /= basic_mathematics::calculateLegendreGeodesyNormalizationFactor( 2, 2 );
+
+    sinePartials.block(0, 0, 3, 1) /= basic_mathematics::calculateLegendreGeodesyNormalizationFactor( 2, 1 );
+    sinePartials.block(0, 1, 3, 1) /= basic_mathematics::calculateLegendreGeodesyNormalizationFactor( 2, 2 );
+
+    // // in case no order 1
+    // cosinePartials.block(0, 1, 3, 1) = Eigen::MatrixXd::Zero( 3, 1 );
+    // sinePartials.block(0, 0, 3, 1) = Eigen::MatrixXd::Zero( 3, 1 );
+
+    deformationPartial.block(0, 0, 3, 3) += cosinePartials;
+    deformationPartial.block(0, 3, 3, 2) += sinePartials;
+    
 }
 
 }  // namespace acceleration_partials

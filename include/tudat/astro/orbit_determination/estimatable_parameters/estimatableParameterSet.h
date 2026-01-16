@@ -926,6 +926,34 @@ std::vector< std::string > getListOfBodiesWithMassStateToEstimate(
     return bodiesToEstimate;
 }
 
+//! Function to get the list of names of bodies for which initial gravity deformation state is estimated.
+/*!
+ *  Function to get the list of names of bodies for which initial gravity deformation state is estimated.
+ *  \param estimatableParameters Object containing all parameters that are to be estimated.
+ *  \return List of names of bodies for which gravity deformation state is estimated.
+ */
+template< typename InitialStateParameterType >
+std::vector< std::string > getListOfBodiesWithGravityDeformationStateToEstimate(
+        const std::shared_ptr< EstimatableParameterSet< InitialStateParameterType > > estimatableParameters )
+{
+    std::vector< std::string > bodiesToEstimate;
+
+    // Retrieve initial dynamical parameters.
+    std::vector< std::shared_ptr< EstimatableParameter< Eigen::Matrix< InitialStateParameterType, Eigen::Dynamic, 1 > > > >
+            initialDynamicalParameters = estimatableParameters->getEstimatedInitialStateParameters( );
+
+    // Iterate over list of bodies of which the partials of the accelerations acting on them are required.
+    for( unsigned int i = 0; i < initialDynamicalParameters.size( ); i++ )
+    {
+        if( initialDynamicalParameters.at( i )->getParameterName( ).first == initial_gravity_deformation_state )
+        {
+            bodiesToEstimate.push_back( initialDynamicalParameters.at( i )->getParameterName( ).second.first );
+        }
+    }
+
+    return bodiesToEstimate;
+}
+
 //! Function to retrieve the list of bodies for which the translational state is estimated in a multi-arc fashion
 /*!
  * Function to retrieve the list of bodies for which the translational state is estimated in a multi-arc fashion
@@ -983,6 +1011,11 @@ std::map< propagators::IntegratedStateType, std::vector< std::string > > getList
         else if( ( initialDynamicalParameters.at( i )->getParameterName( ).first == initial_rotational_body_state ) )
         {
             bodiesToEstimate[ propagators::rotational_state ].push_back(
+                    initialDynamicalParameters.at( i )->getParameterName( ).second.first );
+        }
+        else if( ( initialDynamicalParameters.at( i )->getParameterName( ).first == initial_gravity_deformation_state ) )
+        {
+            bodiesToEstimate[ propagators::gravity_deformation_state ].push_back(
                     initialDynamicalParameters.at( i )->getParameterName( ).second.first );
         }
     }
@@ -1078,6 +1111,37 @@ getListOfMassStateParametersToEstimate(
     return massStateParameters;
 }
 
+//! Function to retrieve the list of gravity deformation state parameters from full parameter list
+/*!
+ * Function to retrieve the list of gravity deformation state parameters from full parameter list
+ * \param estimatableParameters Full set of estimated parameters
+ * \return List of gravity deformation state parameters
+ */
+template< typename InitialStateParameterType >
+std::vector<
+        std::shared_ptr< estimatable_parameters::EstimatableParameter< Eigen::Matrix< InitialStateParameterType, Eigen::Dynamic, 1 > > > >
+getListOfGravityDeformationStateParametersToEstimate(
+        const std::shared_ptr< EstimatableParameterSet< InitialStateParameterType > > estimatableParameters )
+{
+    std::vector< std::shared_ptr<
+            estimatable_parameters::EstimatableParameter< Eigen::Matrix< InitialStateParameterType, Eigen::Dynamic, 1 > > > >
+            initialDynamicalParameters = estimatableParameters->getEstimatedInitialStateParameters( );
+    std::vector< std::shared_ptr<
+            estimatable_parameters::EstimatableParameter< Eigen::Matrix< InitialStateParameterType, Eigen::Dynamic, 1 > > > >
+            gravityDeformationStateParameters;
+
+    // Iterate over list of bodies of which the partials of the accelerations acting on them are required.
+    for( unsigned int i = 0; i < initialDynamicalParameters.size( ); i++ )
+    {
+        if( initialDynamicalParameters.at( i )->getParameterName( ).first == initial_gravity_deformation_state )
+        {
+            gravityDeformationStateParameters.push_back( initialDynamicalParameters.at( i ) );
+        }
+    }
+
+    return gravityDeformationStateParameters;
+}
+
 //! Function to get the complete list of initial dynamical states that are to be estimated, sorted by dynamics type.
 /*!
  *  Function to get the complete list of initial dynamical states that are to be estimated, sorted by dynamics type.
@@ -1108,6 +1172,11 @@ getListOfInitialDynamicalStateParametersEstimate(
         else if( ( initialDynamicalParameters.at( i )->getParameterName( ).first == initial_rotational_body_state ) )
         {
             initialDynamicalStateParametersEstimate[ propagators::rotational_state ].push_back(
+                    initialDynamicalParameters.at( i )->getParameterName( ).second );
+        }
+        else if( ( initialDynamicalParameters.at( i )->getParameterName( ).first == initial_gravity_deformation_state ) )
+        {
+            initialDynamicalStateParametersEstimate[ propagators::gravity_deformation_state ].push_back(
                     initialDynamicalParameters.at( i )->getParameterName( ).second );
         }
         else if( ( initialDynamicalParameters.at( i )->getParameterName( ).first == initial_mass_state ) )

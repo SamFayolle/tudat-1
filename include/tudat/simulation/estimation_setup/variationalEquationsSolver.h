@@ -356,6 +356,36 @@ bool checkPropagatorSettingsAndParameterEstimationConsistency(
             }
             break;
         }
+        case gravity_deformation_state: {
+            std::shared_ptr< GravityDeformationPropagatorSettings< StateScalarType, TimeType > > gravityDeformationPropagatorSettings =
+                    std::dynamic_pointer_cast< GravityDeformationPropagatorSettings< StateScalarType, TimeType > >( propagatorSettings );
+
+            // Retrieve estimated and propagated translational states, and check equality.
+            std::vector< std::string > propagatedBodies = gravityDeformationPropagatorSettings->bodiesWithGravityToPropagate_;
+            std::vector< std::string > estimatedBodies =
+                    estimatable_parameters::getListOfBodiesWithGravityDeformationStateToEstimate( parametersToEstimate );
+            if( propagatedBodies.size( ) != estimatedBodies.size( ) )
+            {
+                std::string errorMessage = "Error, propagated and estimated body vector sizes are inconsistent " +
+                        std::to_string( propagatedBodies.size( ) ) + " " + std::to_string( estimatedBodies.size( ) );
+                throw std::runtime_error( errorMessage );
+                isInputConsistent = 0;
+            }
+            else
+            {
+                for( unsigned int i = 0; i < propagatedBodies.size( ); i++ )
+                {
+                    if( propagatedBodies.at( i ) != estimatedBodies.at( i ) )
+                    {
+                        std::string errorMessage = "Error, propagated and estimated body vectors inconsistent at index" +
+                                std::string( propagatedBodies.at( i ) ) + " " + std::string( estimatedBodies.at( i ) );
+                        throw std::runtime_error( errorMessage );
+                        isInputConsistent = 0;
+                    }
+                }
+            }
+            break;
+        }
         case body_mass_state: {
             std::shared_ptr< MassPropagatorSettings< StateScalarType, TimeType > > massPropagatorSettings =
                     std::dynamic_pointer_cast< MassPropagatorSettings< StateScalarType, TimeType > >( propagatorSettings );
@@ -415,6 +445,13 @@ bool checkPropagatorSettingsAndParameterEstimationConsistency(
                 multiTypePropagatorSettings->propagatorSettingsMap_.count( rotational_state ) == 0 )
             {
                 throw std::runtime_error( "Error, estimating but not propagating rotational dynamics" );
+                isInputConsistent = false;
+            }
+
+            if( estimatable_parameters::getListOfBodiesWithGravityDeformationStateToEstimate( parametersToEstimate ).size( ) > 0 &&
+                multiTypePropagatorSettings->propagatorSettingsMap_.count( gravity_deformation_state ) == 0 )
+            {
+                throw std::runtime_error( "Error, estimating but not propagating gravity deformation dynamics" );
                 isInputConsistent = false;
             }
             break;

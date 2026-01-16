@@ -18,8 +18,10 @@
 #include "tudat/astro/propagators/nBodyStateDerivative.h"
 #include "tudat/astro/propagators/rotationalMotionStateDerivative.h"
 #include "tudat/astro/propagators/bodyMassStateDerivative.h"
+#include "tudat/astro/propagators/gravityDerivative.h"
 #include "tudat/simulation/estimation_setup/createAccelerationPartials.h"
 #include "tudat/simulation/estimation_setup/createTorquePartials.h"
+#include "tudat/simulation/estimation_setup/createGravityDeformationPartials.h"
 
 namespace tudat
 {
@@ -194,6 +196,24 @@ std::map< propagators::IntegratedStateType, orbit_determination::StateDerivative
                                     ->getTorquesMap( );
                     stateDerivativePartials[ propagators::rotational_state ] =
                             createTorquePartialsMap< StateScalarType >( torqueModelList, bodies, parametersToEstimate );
+                }
+                break;
+            }
+            case propagators::gravity_deformation_state: 
+            {
+                if( stateDerivativeIterator->second.size( ) > 1 )
+                {
+                    throw std::runtime_error(
+                            "Error, cannot yet process multiple separate same type propagators when making partial derivatives of "
+                            "gravity deformation state." );
+                }
+                else
+                {
+                    // Retrieve gravity deformation models and create partials
+                    basic_astrodynamics::GravityDeformationModelMap deformationModelList = std::dynamic_pointer_cast< propagators::GravityStateDerivative< StateScalarType, TimeType > >( 
+                        stateDerivativeIterator->second.at( 0 ) )->getGravityDeformationModels( );
+                    stateDerivativePartials[ propagators::gravity_deformation_state ] =
+                            createGravityDeformationPartialsMap< StateScalarType >( deformationModelList, bodies, parametersToEstimate );
                 }
                 break;
             }
